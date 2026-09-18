@@ -1,0 +1,106 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Transform: AWS::Serverless-2016-10-31
+Description: AssetTrace backend API. Deploy only after reviewing the contract and approving AWS changes.
+
+Parameters:
+  UserPoolId:
+    Type: String
+    Default: us-east-1_Rmddod48y
+  UserPoolClientId:
+    Type: String
+    Default: 5o2c4idi7i55kfangcld9fmtui
+  EvidenceBucketName:
+    Type: String
+    Default: assettrace-evidence-650687536843
+  AllowedOrigin:
+    Type: String
+    Default: '*'
+  BedrockModelId:
+    Type: String
+    Default: anthropic.claude-3-haiku-20240307-v1:0
+
+Globals:
+  Function:
+    Runtime: nodejs20.x
+    Timeout: 29
+    MemorySize: 512
+    Environment:
+      Variables:
+        USER_POOL_CLIENT_ID: !Ref UserPoolClientId
+        EVIDENCE_BUCKET: !Ref EvidenceBucketName
+        ALLOWED_ORIGIN: !Ref AllowedOrigin
+        BEDROCK_MODEL_ID: !Ref BedrockModelId
+        INSPECTIONS_TABLE: AssetTrace-Inspections
+        EVIDENCE_TABLE: AssetTrace-Evidence
+        COMPARISONS_TABLE: AssetTrace-Comparisons
+
+Resources:
+  AssetTraceApi:
+    Type: AWS::Serverless::HttpApi
+    Properties:
+      StageName: prod
+      CorsConfiguration:
+        AllowOrigins: [!Ref AllowedOrigin]
+        AllowHeaders: [authorization, content-type]
+        AllowMethods: [GET, POST, OPTIONS]
+      Auth:
+        DefaultAuthorizer: CognitoAuthorizer
+        Authorizers:
+          CognitoAuthorizer:
+            JwtConfiguration:
+              issuer: !Sub https://cognito-idp.${AWS::Region}.amazonaws.com/${UserPoolId}
+              audience: [!Ref UserPoolClientId]
+            Identity: "$request.header.Authorization"
+
+  AssetTraceFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      CodeUri: src/
+      Handler: handler.handler
+      Policies:
+        - DynamoDBCrudPolicy: { TableName: AssetTrace-Inspections }
+        - DynamoDBCrudPolicy: { TableName: AssetTrace-Evidence }
+        - DynamoDBCrudPolicy: { TableName: AssetTrace-Comparisons }
+        - S3WritePolicy: { BucketName: !Ref EvidenceBucketName }
+        - Statement:
+            - Effect: Allow
+              Action: [bedrock:Converse]
+              Resource: '*'
+      Events:
+        Register:
+          Type: HttpApi
+          Properties: { ApiId: !Ref AssetTraceApi, Path: /auth/register, Method: POST, Auth: { Authorizer: NONE } }
+        Login:
+          Type: HttpApi
+          Properties: { ApiId: !Ref AssetTraceApi, Path: /auth/login, Method: POST, Auth: { Authorizer: NONE } }
+        CreateInspection:
+          Type: HttpApi
+          Properties: { ApiId: !Ref AssetTraceApi, Path: /inspections, Method: POST }
+        ListInspections:
+          Type: HttpApi
+          Properties: { ApiId: !Ref AssetTraceApi, Path: /inspections, Method: GET }
+        GetInspection:
+          Type: HttpApi
+          Properties: { ApiId: !Ref AssetTraceApi, Path: /inspections/{id}, Method: GET }
+        JoinInspection:
+          Type: HttpApi
+          Properties: { ApiId: !Ref AssetTraceApi, Path: /inspections/{id}/join, Method: POST }
+        UploadUrl:
+          Type: HttpApi
+          Properties: { ApiId: !Ref AssetTraceApi, Path: /inspections/{id}/evidence/upload-url, Method: POST }
+        SaveEvidence:
+          Type: HttpApi
+          Properties: { ApiId: !Ref AssetTraceApi, Path: /inspections/{id}/evidence, Method: POST }
+        Acknowledge:
+          Type: HttpApi
+          Properties: { ApiId: !Ref AssetTraceApi, Path: /inspections/{id}/acknowledge, Method: POST }
+        Lock:
+          Type: HttpApi
+          Properties: { ApiId: !Ref AssetTraceApi, Path: /inspections/{id}/lock, Method: POST }
+        Compare:
+          Type: HttpApi
+          Properties: { ApiId: !Ref AssetTraceApi, Path: /inspections/{id}/compare, Method: POST }
+
+Outputs:
+  ApiUrl:
+    Value: !Sub https://${AssetTraceApi}.execute-api.${AWS::Region}.amazonaws.com/prod

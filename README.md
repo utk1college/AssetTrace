@@ -140,6 +140,6 @@ Follow `DESIGN.md` exactly. The experience is mobile-first, calm, evidence-first
 
 ## Current project status — September 18, 2026
 
-The frontend shell, routes, shared UI components, and redesigned mobile dashboard are present and the production build/lint pass. The project is ready for the three feature owners to implement and test their assigned flows in **mock mode**.
+The frontend shell, routes, shared UI components, redesigned mobile dashboard, and a local backend scaffold/API contract in `Utkrisht.md` are present. The production frontend build/lint pass. The project is ready for the three feature owners to implement and test their assigned flows in **mock mode**.
 
-AWS in `us-east-1` has been verified: the Cognito user pool and app client, three DynamoDB tables, S3 evidence bucket, IAM developer group, and three teammate IAM users exist. No Lambda functions, API Gateway APIs, or S3 CORS configuration exist yet. Consequently, there is **no real API to integrate with** and `VITE_USE_MOCK=false` is not usable yet. The team lead must complete the backend deployment and publish the API contract before the real-mode integration phase.
+AWS in `us-east-1` has been verified: the Cognito user pool and app client, three DynamoDB tables, S3 evidence bucket, IAM developer group, and three teammate IAM users exist. No Lambda functions, API Gateway APIs, or S3 CORS configuration exist yet. Consequently, there is **no real API to integrate with** and `VITE_USE_MOCK=false` is not usable yet. The team lead must verify the remaining table schemas, deploy the backend, configure CORS, and publish the API URL before the real-mode integration phase.
