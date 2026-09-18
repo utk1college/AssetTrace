@@ -1,5 +1,9 @@
-import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom'
+import { BrowserRouter, Routes, Route, Navigate, Outlet } from 'react-router-dom'
 import AppShell from '@/components/layout/AppShell'
+import ProtectedRoute from '@/components/auth/ProtectedRoute'
+import PublicOnlyRoute from '@/components/auth/PublicOnlyRoute'
+import { useEffect } from 'react'
+import { useAuthStore } from '@/store/authStore'
 
 // Pages — stubs will be replaced as each phase is built
 import LoginPage from '@/pages/LoginPage'
@@ -18,15 +22,21 @@ import ComparisonDetailPage from '@/pages/ComparisonDetailPage'
 import ReportPage from '@/pages/ReportPage'
 
 export default function App() {
+  const hydrate = useAuthStore((state) => state.hydrate)
+
+  useEffect(() => {
+    void hydrate()
+  }, [hydrate])
+
   return (
     <BrowserRouter>
-      <AppShell>
-        <Routes>
-          {/* Auth */}
-          <Route path="/" element={<Navigate to="/dashboard" replace />} />
-          <Route path="/login" element={<LoginPage />} />
-          <Route path="/register" element={<RegisterPage />} />
+      <Routes>
+        {/* Auth */}
+        <Route path="/" element={<Navigate to="/dashboard" replace />} />
+        <Route path="/login" element={<PublicOnlyRoute><LoginPage /></PublicOnlyRoute>} />
+        <Route path="/register" element={<PublicOnlyRoute><RegisterPage /></PublicOnlyRoute>} />
 
+        <Route element={<AuthenticatedLayout />}>
           {/* Dashboard */}
           <Route path="/dashboard" element={<DashboardPage />} />
 
@@ -50,8 +60,12 @@ export default function App() {
 
           {/* Report */}
           <Route path="/inspections/:id/report" element={<ReportPage />} />
-        </Routes>
-      </AppShell>
+        </Route>
+      </Routes>
     </BrowserRouter>
   )
+}
+
+function AuthenticatedLayout() {
+  return <ProtectedRoute><AppShell><Outlet /></AppShell></ProtectedRoute>
 }
