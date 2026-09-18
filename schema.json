@@ -1,0 +1,21 @@
+[
+  {
+    "Name": "email",
+    "Required": true
+  },
+  {
+    "Name": "name",
+    "Required": true
+  },
+  {
+    "Name": "role",
+    "AttributeDataType": "String",
+    "DeveloperOnlyAttribute": false,
+    "Mutable": true,
+    "Required": false,
+    "StringAttributeConstraints": {
+      "MinLength": "1",
+      "MaxLength": "20"
+    }
+  }
+]
