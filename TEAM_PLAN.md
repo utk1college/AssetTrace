@@ -19,10 +19,10 @@ This document assigns work without blocking on the backend. Read [README.md](REA
 
 | Owner | Branch | Scope | Starts now? |
 |---|---|---|---|
-| Ashutosh | `feat/auth-service` | Authentication service, store, login, registration, route guard | Yes, mock mode |
-| Sarthak | `feat/inspection-service` | Inspection service, store, create/join workflow, session codes | Yes, mock mode |
-| Shubham | `feat/camera-capture` | Camera, GPS, telemetry, hashing, capture UI | Yes, mock mode and physical-device testing |
-| Utku | `infra/*` | Lambda/API Gateway, API contracts, S3 CORS, IAM, Bedrock, integration | Backend phase |
+| Saahya | `feat/auth-service` | Authentication service, store, login, registration, route guard | Yes, mock mode |
+| Abdul | `feat/inspection-service` | Inspection service, store, create/join workflow, session codes | Yes, mock mode |
+| Shreyash | `feat/camera-capture` | Camera, GPS, telemetry, hashing, capture UI | Yes, mock mode and physical-device testing |
+| Utkrisht | `infra/*` | Lambda/API Gateway, API contracts, S3 CORS, IAM, Bedrock, integration | Backend phase |
 
 ## Shared data contracts
 
