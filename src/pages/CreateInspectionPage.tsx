@@ -1,9 +1,312 @@
-﻿// TODO: Implement CreateInspectionPage
+﻿import { useState } from 'react'
+import { ArrowRight, Bike, Building2, Check, Copy, House } from 'lucide-react'
+import { QRCodeSVG } from 'qrcode.react'
+import { useNavigate } from 'react-router-dom'
+
+import PrimaryButton from '@/components/ui/PrimaryButton'
+import { useInspectionStore } from '@/store/inspectionStore'
+import type {
+  AssetType,
+  InspectionType,
+} from '@/services/inspectionService'
+
+const ASSET_OPTIONS: {
+  value: AssetType
+  label: string
+  icon: typeof Bike
+}[] = [
+  { value: 'scooter', label: 'Scooter', icon: Bike },
+  { value: 'bike', label: 'Bike', icon: Bike },
+  { value: 'apartment', label: 'Apartment', icon: Building2 },
+  { value: 'house', label: 'House', icon: House },
+]
+
+const INSPECTION_OPTIONS: {
+  value: InspectionType
+  label: string
+  description: string
+}[] = [
+  {
+    value: 'move-in',
+    label: 'Move-in',
+    description: 'Record the condition at handover.',
+  },
+  {
+    value: 'move-out',
+    label: 'Move-out',
+    description: 'Record the condition when returning the asset.',
+  },
+]
+
 export default function CreateInspectionPage() {
+  const navigate = useNavigate()
+
+  const createInspection = useInspectionStore(
+    (state) => state.createInspection,
+  )
+  const isLoading = useInspectionStore((state) => state.isLoading)
+  const error = useInspectionStore((state) => state.error)
+
+  const [assetType, setAssetType] = useState<AssetType>('scooter')
+  const [assetName, setAssetName] = useState('')
+  const [inspectionType, setInspectionType] =
+    useState<InspectionType>('move-in')
+  const [createdInspection, setCreatedInspection] = useState<Awaited<
+    ReturnType<typeof createInspection>
+  > | null>(null)
+  const [copied, setCopied] = useState(false)
+
+  const handleSubmit = async (event: React.FormEvent<HTMLFormElement>) => {
+    event.preventDefault()
+
+    if (!assetName.trim()) {
+      return
+    }
+
+    try {
+      const inspection = await createInspection({
+        assetType,
+        assetName,
+        inspectionType,
+      })
+
+      setCreatedInspection(inspection)
+    } catch {
+      // The store exposes the error for the UI.
+    }
+  }
+
+  const handleCopyCode = async () => {
+    if (!createdInspection) {
+      return
+    }
+
+    try {
+      await navigator.clipboard.writeText(createdInspection.sessionCode)
+      setCopied(true)
+
+      window.setTimeout(() => {
+        setCopied(false)
+      }, 2000)
+    } catch {
+      setCopied(false)
+    }
+  }
+
+  if (createdInspection) {
+    return (
+      <div className="min-h-screen bg-[var(--surface)] pb-24">
+        <div className="container py-6">
+          <header className="mb-8">
+            <p className="text-small mb-1">Inspection created</p>
+            <h1 className="text-display">Share this inspection</h1>
+          </header>
+
+          <main className="space-y-6">
+            <section className="card p-5">
+              <div className="flex items-start gap-3">
+                <span className="asset-icon">
+                  {assetType === 'apartment' ? (
+                    <Building2 aria-hidden="true" />
+                  ) : assetType === 'house' ? (
+                    <House aria-hidden="true" />
+                  ) : (
+                    <Bike aria-hidden="true" />
+                  )}
+                </span>
+
+                <div className="min-w-0 flex-1">
+                  <h2 className="text-subheading truncate">
+                    {createdInspection.assetName}
+                  </h2>
+                  <p className="text-small capitalize">
+                    {createdInspection.assetType} ·{' '}
+                    {createdInspection.inspectionType}
+                  </p>
+                </div>
+              </div>
+            </section>
+
+            <section className="card p-6 text-center">
+              <p className="section-label mb-3">SESSION CODE</p>
+
+              <p
+                className="text-2xl font-semibold tracking-[0.22em] text-[var(--text-primary)]"
+                aria-label={`Session code ${createdInspection.sessionCode}`}
+              >
+                {createdInspection.sessionCode}
+              </p>
+
+              <button
+                type="button"
+                onClick={handleCopyCode}
+                className="mt-4 inline-flex min-h-12 items-center gap-2 rounded-lg border border-[var(--border)] px-4 text-small font-medium text-[var(--text-primary)] hover:bg-[var(--surface-subtle)]"
+              >
+                {copied ? (
+                  <Check className="h-4 w-4" aria-hidden="true" />
+                ) : (
+                  <Copy className="h-4 w-4" aria-hidden="true" />
+                )}
+                {copied ? 'Code copied' : 'Copy code'}
+              </button>
+
+              <div className="my-6 flex justify-center">
+                <div className="rounded-xl border border-[var(--border)] bg-white p-4">
+                  <QRCodeSVG
+                    value={createdInspection.sessionCode}
+                    size={192}
+                    includeMargin
+                    aria-label={`QR code for inspection ${createdInspection.sessionCode}`}
+                  />
+                </div>
+              </div>
+
+              <p className="text-small">
+                Share the code or QR code with the other party to join this
+                inspection.
+              </p>
+            </section>
+
+            <div className="space-y-3">
+              <PrimaryButton
+                fullWidth
+                type="button"
+                onClick={() =>
+                  navigate(`/inspections/${createdInspection.id}`)
+                }
+              >
+                Continue to inspection
+                <ArrowRight className="h-5 w-5" aria-hidden="true" />
+              </PrimaryButton>
+
+              <button
+                type="button"
+                onClick={() => navigate('/dashboard')}
+                className="min-h-12 w-full rounded-lg px-4 text-small font-medium text-[var(--text-secondary)] hover:bg-[var(--surface-subtle)]"
+              >
+                Back to dashboard
+              </button>
+            </div>
+          </main>
+        </div>
+      </div>
+    )
+  }
+
   return (
-    <div style={{ padding: '2rem', fontFamily: 'Inter, sans-serif' }}>
-      <h1 style={{ fontSize: '22px', fontWeight: 600 }}>CreateInspectionPage</h1>
-      <p style={{ color: '#6A6A6A', marginTop: '0.5rem' }}>Coming soon — phase implementation pending.</p>
+    <div className="min-h-screen bg-[var(--surface)] pb-24">
+      <div className="container py-6">
+        <header className="mb-8">
+          <p className="text-small mb-1">New inspection</p>
+          <h1 className="text-display">Create an inspection</h1>
+        </header>
+
+        <form onSubmit={handleSubmit} className="space-y-8">
+          <section>
+            <h2 className="section-label mb-3">ASSET TYPE</h2>
+
+            <div className="grid grid-cols-2 gap-3">
+              {ASSET_OPTIONS.map((option) => {
+                const Icon = option.icon
+                const selected = assetType === option.value
+
+                return (
+                  <button
+                    key={option.value}
+                    type="button"
+                    onClick={() => setAssetType(option.value)}
+                    aria-pressed={selected}
+                    className={[
+                      'min-h-20 rounded-xl border p-4 text-left transition-colors',
+                      selected
+                        ? 'border-[var(--accent)] bg-white ring-1 ring-[var(--accent)]'
+                        : 'border-[var(--border)] bg-white hover:bg-[var(--surface-subtle)]',
+                    ].join(' ')}
+                  >
+                    <span className="flex items-center gap-3">
+                      <span className="asset-icon">
+                        <Icon aria-hidden="true" />
+                      </span>
+
+                      <span className="text-subheading">
+                        {option.label}
+                      </span>
+                    </span>
+                  </button>
+                )
+              })}
+            </div>
+          </section>
+
+          <section>
+            <label
+              htmlFor="asset-name"
+              className="section-label mb-3 block"
+            >
+              ASSET NAME
+            </label>
+
+            <input
+              id="asset-name"
+              type="text"
+              value={assetName}
+              onChange={(event) => setAssetName(event.target.value)}
+              placeholder="e.g. Honda Activa 6G"
+              autoComplete="off"
+              className="min-h-12 w-full rounded-lg border border-[var(--border)] bg-white px-4 text-[15px] text-[var(--text-primary)] outline-none placeholder:text-[var(--text-tertiary)] focus:border-[var(--accent)] focus:ring-2 focus:ring-[var(--accent)]/10"
+            />
+          </section>
+
+          <section>
+            <h2 className="section-label mb-3">INSPECTION TYPE</h2>
+
+            <div className="space-y-3">
+              {INSPECTION_OPTIONS.map((option) => {
+                const selected = inspectionType === option.value
+
+                return (
+                  <button
+                    key={option.value}
+                    type="button"
+                    onClick={() => setInspectionType(option.value)}
+                    aria-pressed={selected}
+                    className={[
+                      'min-h-20 w-full rounded-xl border p-4 text-left transition-colors',
+                      selected
+                        ? 'border-[var(--accent)] bg-white ring-1 ring-[var(--accent)]'
+                        : 'border-[var(--border)] bg-white hover:bg-[var(--surface-subtle)]',
+                    ].join(' ')}
+                  >
+                    <p className="text-subheading">{option.label}</p>
+                    <p className="text-small mt-1">{option.description}</p>
+                  </button>
+                )
+              })}
+            </div>
+          </section>
+
+          {error && (
+            <div
+              role="alert"
+              className="rounded-xl border border-[var(--error)]/20 bg-[var(--error)]/5 p-4"
+            >
+              <p className="text-small font-medium text-[var(--error)]">
+                {error}
+              </p>
+            </div>
+          )}
+
+          <section>
+            <PrimaryButton
+              fullWidth
+              type="submit"
+              disabled={isLoading || !assetName.trim()}
+            >
+              {isLoading ? 'Creating inspection...' : 'Create inspection'}
+            </PrimaryButton>
+          </section>
+        </form>
+      </div>
     </div>
   )
 }
