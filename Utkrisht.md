@@ -1,30 +1,82 @@
 # AssetTrace backend handover
 
-**Status:** Local backend scaffold and contract prepared; AWS deployment is intentionally pending final schema/configuration review and explicit deployment approval.
+**Project:** AssetTrace  
+**Hackathon:** First Commit | Bharat Builds Tour — WeMakeDevs × AWS  
+**Team:** Pandoras Box (N9ASHJ)  
+**Checkpoint:** September 18, 2026 backend/AWS implementation session
 
-## API base
+## Current status
 
-After deployment, publish the generated HTTP API URL here and in `.env.local`:
+The backend is deployed to AWS and the core inspection workflow has been experimentally verified against the live environment.
+
+The remaining backend verification is the real image-comparison path:
 
 ```text
-VITE_API_ENDPOINT=https://<api-id>.execute-api.us-east-1.amazonaws.com/prod
+return evidence → S3 → /compare → Lambda → Bedrock → structured result → DynamoDB
 ```
 
-Until that URL exists, all frontend work stays in mock mode.
+Do not describe AI comparison as verified until `/compare` has successfully run against real baseline and return images.
+
+## Deployed environment
+
+API base URL:
+
+```text
+https://5v3g0fkokj.execute-api.us-east-1.amazonaws.com/prod
+```
+
+AWS resources:
+
+- CloudFormation stack: `assettrace`
+- Lambda: `assettrace-AssetTraceFunction-7986NQhMyEfO`
+- CloudWatch log group: `/aws/lambda/assettrace-AssetTraceFunction-7986NQhMyEfO`
+- S3 bucket: `assettrace-evidence-650687536843`
+- DynamoDB tables: `AssetTrace-Inspections`, `AssetTrace-Evidence`, `AssetTrace-Comparisons`
+- Region: `us-east-1`
+
+SAM validation, linting, build, deployment, and a subsequent stack update completed successfully. The installed SAM CLI did not support `sam build --clean`; the normal build command was used instead.
 
 ## Authentication
 
-`POST /auth/register` and `POST /auth/login` are public routes. All other routes require:
+Cognito user pool:
+
+```text
+us-east-1_Rmddod48y
+```
+
+App client:
+
+```text
+5o2c4idi7i55kfangcld9fmtui
+```
+
+Public routes:
+
+| Method | Route | Status |
+|---|---|---|
+| POST | `/auth/register` | Verified |
+| POST | `/auth/confirm` | Verified |
+| POST | `/auth/login` | Verified |
+
+Protected routes require:
 
 ```http
 Authorization: Bearer <Cognito access token>
 Content-Type: application/json
 ```
 
+Registration returns `userConfirmed`. The frontend must show the confirmation step when this is `false`.
+
 Registration body:
 
 ```json
 {"email":"renter@example.com","password":"...","name":"Renter","role":"renter"}
+```
+
+Confirmation body:
+
+```json
+{"email":"renter@example.com","confirmationCode":"123456"}
 ```
 
 Login body:
@@ -33,87 +85,149 @@ Login body:
 {"email":"renter@example.com","password":"..."}
 ```
 
-Every error uses this shape:
+Invalid or nonexistent users return a controlled `INVALID_CREDENTIALS` error instead of a generic 500.
+
+## Verified API routes
+
+| Method | Route | Purpose | Status |
+|---|---|---|---|
+| POST | `/inspections` | Create an inspection | Verified |
+| GET | `/inspections` | List the authenticated owner’s inspections | Verified |
+| GET | `/inspections/{id}` | Read an inspection visible to the caller | Verified |
+| POST | `/inspections/{id}/join` | Join by session code | Verified |
+| POST | `/inspections/{id}/evidence/upload-url` | Create a short-lived S3 upload URL | Verified |
+| POST | `/inspections/{id}/evidence` | Save evidence metadata after upload | Verified |
+| POST | `/inspections/{id}/acknowledge` | Record a party acknowledgement | Verified |
+| POST | `/inspections/{id}/lock` | Lock after both parties acknowledge | Verified |
+| POST | `/inspections/{id}/compare` | Run before/after AI comparison | Pending live verification |
+
+## Verified inspection flow
+
+A real inspection was created with:
+
+```text
+inspectionId: 39ab8e58-00a8-46a2-b70f-f95696d14551
+sessionCode: 5EE3EA
+assetType: bike
+assetName: Test Bike
+inspectionType: handover
+areas: front, left, right, rear
+status: in-progress
+```
+
+Verified behaviors:
+
+- The owner cannot join their own inspection.
+- A separate renter account can register, confirm, log in, join with the session code, and retrieve the inspection.
+- Both parties can acknowledge the baseline.
+- The baseline can then be locked.
+- A baseline upload request after locking returns `INSPECTION_LOCKED`.
+- Return-phase upload URLs remain available after baseline locking.
+
+## Evidence and storage contract
+
+S3 keys are scoped as:
+
+```text
+inspections/<inspectionId>/<evidenceId>
+```
+
+The evidence upload flow is:
+
+1. Request `/evidence/upload-url` with `areaId`, `contentType`, and optional `phase`.
+2. Upload bytes directly to S3 using the returned presigned PUT URL.
+3. Preserve the returned `Content-Type` header.
+4. Save metadata through `/evidence`.
+
+Evidence metadata includes:
 
 ```json
-{"error":{"code":"INVALID_REQUEST","message":"Human-readable explanation"}}
+{
+  "evidenceId":"...",
+  "areaId":"front",
+  "phase":"baseline",
+  "key":"inspections/<inspection-id>/<evidence-id>",
+  "sha256":"<hex>",
+  "capturedAt":"2026-09-18T15:30:00Z",
+  "location":{"latitude":12.9,"longitude":77.6,"accuracy":12},
+  "suspicious":false
+}
 ```
 
-## Endpoint contract
+The real test image was `E:\Projects\weMakeDevs\test.jpg` with SHA-256:
 
-| Method | Route | Purpose |
-|---|---|---|
-| POST | `/auth/register` | Create a Cognito user |
-| POST | `/auth/login` | Return Cognito access, ID, and refresh tokens |
-| POST | `/inspections` | Create an inspection |
-| GET | `/inspections` | List inspections owned by the authenticated user |
-| GET | `/inspections/{id}` | Read an inspection visible to the authenticated party |
-| POST | `/inspections/{id}/join` | Join by session code |
-| POST | `/inspections/{id}/evidence/upload-url` | Create a 10-minute presigned S3 PUT URL |
-| POST | `/inspections/{id}/evidence` | Save evidence metadata after upload |
-| POST | `/inspections/{id}/acknowledge` | Record the caller’s acknowledgement |
-| POST | `/inspections/{id}/lock` | Lock only after both parties acknowledge |
-| POST | `/inspections/{id}/compare` | Run the controlled before/after comparison |
-
-Inspection creation body:
-
-```json
-{"assetType":"scooter","assetName":"Honda Activa","inspectionType":"move-in","areas":["front","left-side","right-side","rear"]}
+```text
+760bfb762bcef621062a1e8f0a53636422a2b1f302b383c87b861b80ce818973
 ```
 
-The response contains `id`, `sessionCode`, `ownerId`, `status`, `areas`, `completedAreaIds`, `createdAt`, and `updatedAt`. Status values are `in-progress`, `awaiting-confirmation`, and `locked`.
+The backend validates supported image types, inspection-scoped S3 keys, S3 object existence/type, valid phases, conditional evidence writes, and locked-baseline immutability. Evidence remains tamper-evident/verifiable; the product does not claim impossible-to-fake evidence or legal admissibility.
 
-Join body:
+## DynamoDB contract
 
-```json
-{"sessionCode":"X8F2K9"}
+- `AssetTrace-Inspections`: partition key `inspectionId`, sort key `sk`; inspection metadata is stored under `META#<inspectionId>`.
+- `AssetTrace-Evidence`: evidence records are scoped to the inspection and evidence identifier.
+- `AssetTrace-Comparisons`: comparison records use `inspectionId` as the partition key and `sk` as the sort key, with comparison keys in the `CMP#<comparisonId>` form.
+
+The current implementation still uses scans for owner and session-code lookup because production GSI names have not been verified. This is acceptable for the MVP test environment but should be replaced with indexed queries before production-scale traffic.
+
+## Bedrock comparison status
+
+The deployed comparison design uses Amazon Nova 2 Lite (`amazon.nova-2-lite-v1:0`) through `ConverseCommand`.
+
+The intended flow is:
+
+1. Retrieve baseline and return images from S3.
+2. Send the actual image bytes as multimodal Bedrock input.
+3. Ask Bedrock to identify visible changes by area.
+4. Classify each result as `Existing`, `New`, `Uncertain`, or `No visible change`.
+5. Return confidence and explanation fields.
+6. Validate and persist the structured result in `AssetTrace-Comparisons`.
+
+The live `/compare` inference call, comparison persistence/retrieval, and changed-versus-unchanged image tests are still pending. Do not mark them complete until tested with real S3 evidence.
+
+## Verification checklist
+
+| Component / flow | Status |
+|---|---|
+| Cognito registration | Verified |
+| Email confirmation | Verified |
+| Cognito login | Verified |
+| JWT authorization | Verified |
+| Invalid-login handling | Verified |
+| Create inspection | Verified |
+| Owner cannot join own inspection | Verified |
+| Second-user join | Verified |
+| Get inspection | Verified |
+| Baseline upload URL | Verified |
+| Actual S3 image upload | Verified |
+| Save evidence metadata | Verified |
+| SHA-256 evidence hash | Verified |
+| Two-party acknowledgement | Verified |
+| Baseline lock | Verified |
+| Baseline immutability | Verified |
+| Return upload URL | Verified |
+| Return evidence save | Remaining |
+| Bedrock `/compare` inference | Remaining |
+| Comparison persistence/retrieval | Remaining |
+| Full frontend → AWS flow | Remaining |
+
+## Next testing phase
+
+1. Complete one return evidence upload and metadata save.
+2. Run `/compare` with real baseline and return evidence references.
+3. Verify the Nova 2 Lite response and comparison item in DynamoDB.
+4. Test changed-image and unchanged-image pairs.
+5. Test invalid and missing comparison inputs.
+6. Test the complete frontend flow with `VITE_USE_MOCK=false`.
+7. Verify the report/dashboard renders the real API response.
+
+## Frontend handoff
+
+Once the remaining live comparison checks pass, set the deployed API URL in `.env.local`:
+
+```text
+VITE_USE_MOCK=false
+VITE_API_ENDPOINT=https://5v3g0fkokj.execute-api.us-east-1.amazonaws.com/prod
 ```
 
-Upload URL body:
-
-```json
-{"areaId":"front","contentType":"image/jpeg"}
-```
-
-The client must upload the bytes with `PUT` using the returned `uploadUrl`, preserving the returned `Content-Type`, then save metadata:
-
-```json
-{"evidenceId":"...","areaId":"front","key":"inspections/<inspection-id>/<evidence-id>","sha256":"<hex>","capturedAt":"2026-09-18T15:30:00Z","location":{"latitude":12.9,"longitude":77.6,"accuracy":12},"suspicious":false}
-```
-
-## Storage contract
-
-- Existing DynamoDB tables are `AssetTrace-Inspections`, `AssetTrace-Evidence`, and `AssetTrace-Comparisons` in `us-east-1`.
-- The known inspections table key is `inspectionId` (partition) plus `sk` (sort). The scaffold stores the inspection item under `META#<inspectionId>`.
-- Evidence items use `inspectionId` and `evidenceId`; comparison items use `inspectionId` and `comparisonId`. Verify these two existing table key schemas with `DescribeTable` before deployment; the local AWS CLI was unavailable during scaffold validation.
-- The scaffold uses DynamoDB scans for owner/session lookup because the existing GSI names have not been verified. Add and use GSIs before production-scale traffic.
-- S3 keys are scoped as `inspections/<inspectionId>/<evidenceId>`.
-
-## Deployment checklist
-
-Before deploying `backend/template.yaml`:
-
-1. Verify the evidence/comparison table keys and any GSIs.
-2. Verify the Cognito app client supports `USER_PASSWORD_AUTH` and the `custom:role` attribute.
-3. Restrict `AllowedOrigin` from `*` to the deployed frontend origin.
-4. Configure S3 bucket CORS from `backend/s3-cors.json` for the frontend and deployed API workflow.
-5. Review the Lambda execution policy, especially Bedrock access and S3 prefix restrictions.
-6. Confirm the Bedrock model is enabled in `us-east-1`.
-7. Obtain explicit approval before `sam deploy` or any AWS mutation.
-
-## Local validation
-
-```powershell
-cd backend
-npm install
-npm run check
-```
-
-The backend is not considered real-mode ready until the API is deployed, the API URL is added to `.env.local`, the S3 CORS configuration is applied, and the full browser flow passes with `VITE_USE_MOCK=false`.
-
-## Known limitations
-
-- The comparison route sends evidence references to Bedrock and stores the model response; it needs a reviewed prompt/output schema before demo use.
-- Registration may require Cognito email confirmation depending on the user-pool configuration.
-- Scan-based lookups are a safe scaffold, not a production indexing strategy.
-- Evidence checks flag suspicious signals; they do not prove authenticity or legal admissibility.
+Until the full browser flow is tested, frontend development should continue in mock mode. The frontend must account for email confirmation, carry the evidence `phase`, and treat AI results as reviewable observations rather than legal conclusions.
