@@ -66,7 +66,7 @@ interface EvidenceMetadata {
 }
 ```
 
-## Ashutosh — authentication
+## Saahya — authentication
 
 Build `src/services/mock/authMock.ts`, `src/services/real/authReal.ts`, `src/services/authService.ts`, and `src/store/authStore.ts`; then complete `LoginPage.tsx`, `RegisterPage.tsx`, and route protection.
 
@@ -82,9 +82,9 @@ getToken(): string | null
 
 Mock mode stores a mock user/token in localStorage and exposes useful validation errors. Real mode must use the provided Cognito pool/client configuration, but do not wire or test it until Utku confirms the expected authentication model and callback/error contract.
 
-Your PR must include `A.md`: completed work, mock test steps, exported types, and any integration question/blocker.
+Your PR must include `Saahya.md`: completed work, mock test steps, exported types, and any integration question/blocker.
 
-## Sarthak — inspections
+## Abdul — inspections
 
 Build `src/services/mock/inspectionMock.ts`, `src/services/real/inspectionReal.ts`, `src/services/inspectionService.ts`, `src/store/inspectionStore.ts`, `src/utils/sessionCode.ts`, `src/config/constants.ts`, `CreateInspectionPage.tsx`, and `JoinInspectionPage.tsx`.
 
@@ -100,9 +100,9 @@ updateInspection(id: string, updates: Partial<Inspection>): Promise<Inspection>
 
 Generate six-character uppercase codes without ambiguous characters (`0/O`, `1/I`, `5/S`, `8/B`). Include documented inspection areas for each asset type. The success state should show a session code and QR code; invalid-code and empty states are required.
 
-Your PR must include `S.md`: completed work, mock test steps, inspection type/interface, session-code behaviour, and backend questions.
+Your PR must include `Abdul.md`: completed work, mock test steps, inspection type/interface, session-code behaviour, and backend questions.
 
-## Shubham — camera and evidence
+## Shreyash — camera and evidence
 
 Build `useCamera`, `useGeolocation`, `useTelemetry`, `sha256`, anti-spoofing utilities, `CameraCapture`, `CaptureStatus`, and `CaptureScreen`.
 
@@ -116,7 +116,7 @@ Requirements:
 - Run one random tilt challenge per inspection; treat it as a signal, not proof.
 - Test on at least one physical mobile device and document browser limitations.
 
-Your PR must include `Sh.md`: completed work, mobile test steps, evidence shape, implemented checks, browser notes, and backend questions.
+Your PR must include `Shreyash.md`: completed work, mobile test steps, evidence shape, implemented checks, browser notes, and backend questions.
 
 ## Utku — backend release gate
 
@@ -132,7 +132,7 @@ Before teammates can use real mode, complete and document all of the following:
 6. Verify least-privilege Lambda roles, evidence ownership checks, and that a locked baseline cannot be changed.
 7. Add CloudWatch logs/error visibility and test the browser flow with `VITE_USE_MOCK=false`.
 
-Publish this in `U.md` before requesting real-mode work: API base URL, endpoint contracts, auth/token handling, S3 upload CORS/headers, DynamoDB key/index assumptions, test instructions, and known limitations.
+Publish this in `Utkrisht.md` before requesting real-mode work: API base URL, endpoint contracts, auth/token handling, S3 upload CORS/headers, DynamoDB key/index assumptions, test instructions, and known limitations.
 
 ## Merge and handover checklist
 
