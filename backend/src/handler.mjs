@@ -32,7 +32,7 @@ const config = {
   evidenceTable: process.env.EVIDENCE_TABLE ?? 'AssetTrace-Evidence',
   comparisonsTable: process.env.COMPARISONS_TABLE ?? 'AssetTrace-Comparisons',
   bucket: process.env.EVIDENCE_BUCKET ?? 'assettrace-evidence-650687536843',
-  modelId: process.env.BEDROCK_MODEL_ID ?? 'amazon.nova-2-lite-v1:0',
+  modelId: process.env.BEDROCK_MODEL_ID ?? 'global.amazon.nova-2-lite-v1:0',
 }
 
 const json = (statusCode, body) => ({ statusCode, headers: { 'content-type': 'application/json', 'access-control-allow-origin': process.env.ALLOWED_ORIGIN ?? '*' }, body: JSON.stringify(body) })
