@@ -1,12 +1,12 @@
 # AssetTrace implementation plan
 
-**Updated:** September 19, 2026
+**Updated:** September 20, 2026
 **UI authority:** [DESIGN.md](DESIGN.md) is the single source of truth for every product interface.
 **Current integration mode:** Real mode is available at the deployed API; mock mode remains useful for isolated UI work.
 
 Read [README.md](README.md) first for the product flow and environment setup, then read `DESIGN.md` before changing any page or component.
 
-## Current baseline — complete
+## Current status — integrated
 
 The following foundation work is complete and is no longer active feature work:
 
@@ -16,6 +16,15 @@ The following foundation work is complete and is no longer active feature work:
 - Deployed API Gateway/Lambda, Cognito JWT authorizer, DynamoDB tables, S3 presigned-upload route, acknowledgement, baseline lock, and Bedrock comparison route.
 - Browser integration for real-mode authentication and inspection creation/joining.
 - Session-code compatibility for both legacy hexadecimal codes and new unambiguous codes.
+- Account registration no longer assigns a permanent Owner or Renter role.
+- Session creation assigns the creator as Owner or Renter; joining assigns the opposite participant role.
+- Dashboard participation is derived from each inspection session, not account metadata.
+- Owner-defined capture-point titles are stored with stable IDs and reused for renter return capture.
+- Owner-only baseline uploads, renter-only return uploads, two-party acknowledgement, and baseline locking are enforced in mock mode and the deployed backend.
+- Evidence listing returns signed image-view URLs for participant review.
+- Comparison and report screens use persisted evidence and comparison results; no fabricated dashboard reports remain.
+- Comparison accepts up to 20 images per side, covering larger apartment inspections.
+- The deployed backend supports evidence listing and latest-comparison retrieval.
 
 The known verified deployment is:
 
@@ -24,11 +33,13 @@ VITE_USE_MOCK=false
 VITE_API_ENDPOINT=https://5v3g0fkokj.execute-api.us-east-1.amazonaws.com/prod
 ```
 
-The remaining product work follows the README flow:
+The delivered product flow is:
 
 ```text
 Capture → Verify → Acknowledge → Lock → Return → Compare → Report
 ```
+
+The browser-level workflow still needs final team acceptance at 375px and 390px. Bedrock has produced and persisted a successful comparison result; unclear images correctly return `Uncertain`. The deployed model configuration and comparison path are left unchanged.
 
 ## Working agreement
 
@@ -52,30 +63,31 @@ Every teammate should give their AI agent this context before starting work:
 6. For async work, include loading, empty, permission-denied, validation, and recovery states. Preserve an unsaved capture locally if upload fails.
 7. Validate with the prescribed checks, record exact manual test steps, and add a concise handover note containing completed work, files changed, API assumptions, and remaining blockers.
 
-## Next feature set and ownership
+## Completed ownership areas
 
-| Owner | Branch | Active scope | Dependencies | Definition of done |
+| Area | Delivered result | Status |
 |---|---|---|---|---|
-| Abdul | `feat/inspection-workflow` | Replace static dashboard data with the inspection facade; implement inspection workflow/detail and checklist progress using create/get/list results. | Existing auth and inspection services. | Owner sees live inspections, states are handled, and a created or joined inspection opens a usable workflow screen. |
-| Saahya | `feat/verification-lock` | Build the review, joint acknowledgement, and baseline-lock flow using authenticated inspection state. Add a small facade/store boundary for acknowledge/lock if needed. | Utkrisht confirms response shapes for acknowledge/lock; Abdul exposes the workflow hand-off. | Both roles see review state, acknowledgement is explicit, lock is disabled until both acknowledge, and locked state is clear. |
-| Shreyash | `feat/camera-evidence` | Complete camera-first guided capture, geolocation/telemetry, SHA-256, capture readiness, and resilient baseline/return evidence upload flow. | Utkrisht’s evidence endpoint contract; physical-device testing. | Live camera only, no gallery fallback, device permission/error states, direct presigned upload, metadata save, and documented mobile test results. |
-| Utkrisht | `infra/next-phase` | Publish and implement the remaining read contracts: inspection evidence listing, comparison retrieval/report data, and any response fields required by the three frontend flows. Verify return evidence save and one controlled Bedrock comparison run. | Coordinate request/response shapes before frontend work. | Versioned API notes in `Utkrisht.md`, CORS/authorization verified, return evidence saved, comparison persisted/retrievable, and a tested error contract. |
+| Inspection workflow | Live dashboard, workflow, progress, checklist, and status navigation | Complete |
+| Evidence capture | Camera-only baseline/return capture, hashing, location, presigned upload, retry states | Complete |
+| Verification and lock | Photo review, acknowledgement, lock gating, immutable baseline behavior | Complete |
+| Backend contracts | Auth, inspection, evidence, signed image reads, comparison reads, and report data | Deployed |
+| Comparison | Bedrock comparison and persisted structured result | Working; browser acceptance pending |
+| Session roles | Standard accounts with per-session Owner/Renter participation | Deployed |
 
-## Sequencing
+## Operational notes
 
-1. **Utkrisht** publishes evidence-listing and comparison-read contracts before those screens consume them.
-2. **Abdul** builds the real inspection workflow and dashboard in parallel because create/get/list already exist.
-3. **Shreyash** completes capture and evidence upload against the published evidence contract.
-4. **Saahya** completes acknowledgement and lock once the review screen can surface inspection state.
-5. **Utkrisht** runs the single agreed Bedrock comparison verification only after baseline and return evidence exist.
-6. The team integrates comparison results and reports after the retrieval contract is stable.
+- Main branch is synchronized with origin after the latest integration commit.
+- The deployed API is `https://5v3g0fkokj.execute-api.us-east-1.amazonaws.com/prod`.
+- `VITE_USE_MOCK=false` is the current local integration setting.
+- Do not invoke Bedrock casually; it is a paid operation. Use a controlled test with clear baseline and return evidence.
+- Existing local `backend/s3-cors.json` changes are intentionally preserved separately from the application commits.
 
 ## Shared contracts and boundaries
 
 Keep these current contracts stable unless the owner and Utkrisht agree on a versioned change:
 
 ```ts
-type Role = 'owner' | 'renter'
+type SessionRole = 'owner' | 'renter'
 type AssetType = 'scooter' | 'bike' | 'apartment' | 'house'
 type InspectionType = 'move-in' | 'move-out' | 'handover'
 type InspectionStatus = 'in-progress' | 'awaiting-confirmation' | 'locked'
@@ -84,7 +96,6 @@ interface User {
   id: string
   name: string
   email: string
-  role: Role
 }
 
 interface Inspection {
@@ -94,17 +105,22 @@ interface Inspection {
   assetName: string
   inspectionType: InspectionType
   status: InspectionStatus
-  ownerId: string
+  ownerId?: string
   renterId?: string
+  sessionRole: SessionRole
   areas: string[]
+  capturePoints: { id: string; title: string; order: number }[]
   completedAreaIds: string[]
   createdAt: string
 }
 
 interface EvidenceMetadata {
-  id: string
+  evidenceId: string
   inspectionId: string
   areaId: string
+  capturePointId?: string
+  capturePointTitle?: string
+  phase: 'baseline' | 'return'
   capturedAt: string
   location?: { latitude: number; longitude: number; accuracy: number }
   sha256: string
@@ -112,12 +128,12 @@ interface EvidenceMetadata {
 }
 ```
 
-## Handover checklist
+## Final handoff checklist
 
-- [ ] Scope stayed within the assigned branch and files.
-- [ ] UI follows `DESIGN.md` and works at 375px and 390px.
-- [ ] Mock behavior still works where the feature has a mock adapter.
-- [ ] Real-mode requests use the authenticated facade and display backend errors plainly.
-- [ ] Loading, empty, validation, permission, and recovery states are covered.
-- [ ] Build and lint pass.
-- [ ] The owner’s handover note documents test steps, API assumptions, and blockers.
+- [x] Feature branches integrated and removed after merge.
+- [x] UI follows `DESIGN.md` and source build passes.
+- [x] Mock and real service adapters are maintained.
+- [x] Loading, empty, validation, permission, and recovery states are covered.
+- [x] Frontend build, lint, backend syntax, SAM validation, and SAM build pass.
+- [x] AWS stack deployed successfully with `UPDATE_COMPLETE`.
+- [ ] Team completes browser-level acceptance at 375px and 390px.
