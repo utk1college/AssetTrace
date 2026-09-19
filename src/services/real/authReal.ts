@@ -19,6 +19,12 @@ interface RegisterResponse {
 const endpoint = import.meta.env.VITE_API_ENDPOINT?.trim()
 const CURRENT_USER_KEY = 'assettrace.real.user'
 export const REAL_ACCESS_TOKEN_KEY = 'assettrace.real.access-token'
+const REAL_CURRENT_USER_KEY = CURRENT_USER_KEY
+
+export function clearRealSession(): void {
+  window.localStorage.removeItem(REAL_CURRENT_USER_KEY)
+  window.localStorage.removeItem(REAL_ACCESS_TOKEN_KEY)
+}
 
 interface IdTokenClaims {
   sub?: unknown
@@ -109,13 +115,14 @@ const realAuthService: AuthService = {
 
     const user = decodeIdToken(response.idToken)
     window.localStorage.setItem(CURRENT_USER_KEY, JSON.stringify(user))
-    window.localStorage.setItem(REAL_ACCESS_TOKEN_KEY, response.accessToken)
-    return { user, token: response.accessToken }
+    // API Gateway's JWT authorizer validates the app-client audience, which is
+    // present on the Cognito ID token used for protected API requests.
+    window.localStorage.setItem(REAL_ACCESS_TOKEN_KEY, response.idToken)
+    return { user, token: response.idToken }
   },
 
   async signOut() {
-    window.localStorage.removeItem(CURRENT_USER_KEY)
-    window.localStorage.removeItem(REAL_ACCESS_TOKEN_KEY)
+    clearRealSession()
   },
 
   async getCurrentUser() {
@@ -126,8 +133,7 @@ const realAuthService: AuthService = {
     try {
       return JSON.parse(storedUser) as User
     } catch {
-      window.localStorage.removeItem(CURRENT_USER_KEY)
-      window.localStorage.removeItem(REAL_ACCESS_TOKEN_KEY)
+      clearRealSession()
       return null
     }
   },

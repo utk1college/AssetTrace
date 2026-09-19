@@ -1,6 +1,6 @@
 import { INSPECTION_AREAS } from "@/config/constants";
 import { isValidDeployedSessionCode } from "@/utils/sessionCode";
-import { REAL_ACCESS_TOKEN_KEY } from "./authReal";
+import { clearRealSession, REAL_ACCESS_TOKEN_KEY } from "./authReal";
 import type {
   Comparison,
   ComparisonStatus,
@@ -61,6 +61,10 @@ async function request<T>(path: string, init: RequestInit = {}): Promise<T> {
     const body = (await response
       .json()
       .catch(() => null)) as ApiErrorResponse | null;
+    if (response.status === 401) {
+      clearRealSession();
+      throw new Error("Your session has expired. Please sign in again.");
+    }
     throw new Error(
       body?.error?.message ?? "Inspection request failed. Try again.",
     );
