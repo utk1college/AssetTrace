@@ -28,6 +28,8 @@ export interface Inspection {
   areas: string[]
   completedAreaIds: string[]
   createdAt: string
+  acknowledgements?: Record<string, string>
+  lockedAt?: string
 }
 
 export type CreateInspectionInput = Pick<
@@ -35,9 +37,19 @@ export type CreateInspectionInput = Pick<
   'assetType' | 'assetName' | 'inspectionType'
 >
 
+export interface InspectionService {
+  createInspection(input: CreateInspectionInput): Promise<Inspection>
+  getInspection(id: string): Promise<Inspection>
+  listInspections(userId: string): Promise<Inspection[]>
+  joinInspection(sessionCode: string): Promise<Inspection>
+  updateInspection(id: string, updates: Partial<Inspection>): Promise<Inspection>
+  acknowledgeInspection(id: string, userId: string): Promise<Inspection>
+  lockInspection(id: string): Promise<Inspection>
+}
+
 const useMock = import.meta.env.VITE_USE_MOCK !== 'false'
 
-const inspectionService = useMock
+const inspectionService: InspectionService = useMock
   ? inspectionMock
   : inspectionReal
 

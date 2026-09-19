@@ -19,6 +19,8 @@ interface InspectionStore {
     id: string,
     updates: Partial<Inspection>,
   ) => Promise<Inspection>
+  acknowledgeInspection: (id: string, userId: string) => Promise<Inspection>
+  lockInspection: (id: string) => Promise<Inspection>
 
   clearError: () => void
   clearCurrentInspection: () => void
@@ -175,6 +177,40 @@ export const useInspectionStore = create<InspectionStore>((set) => ({
         error: message,
       })
 
+      throw error
+    }
+  },
+
+  acknowledgeInspection: async (id, userId) => {
+    set({ isLoading: true, error: null })
+    try {
+      const inspection = await inspectionService.acknowledgeInspection(id, userId)
+      set((state) => ({
+        inspections: state.inspections.map((item) => item.id === id ? inspection : item),
+        currentInspection: state.currentInspection?.id === id ? inspection : state.currentInspection,
+        isLoading: false,
+      }))
+      return inspection
+    } catch (error) {
+      const message = getErrorMessage(error)
+      set({ isLoading: false, error: message })
+      throw error
+    }
+  },
+
+  lockInspection: async (id) => {
+    set({ isLoading: true, error: null })
+    try {
+      const inspection = await inspectionService.lockInspection(id)
+      set((state) => ({
+        inspections: state.inspections.map((item) => item.id === id ? inspection : item),
+        currentInspection: state.currentInspection?.id === id ? inspection : state.currentInspection,
+        isLoading: false,
+      }))
+      return inspection
+    } catch (error) {
+      const message = getErrorMessage(error)
+      set({ isLoading: false, error: message })
       throw error
     }
   },
