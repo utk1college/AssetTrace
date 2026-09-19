@@ -1,5 +1,5 @@
 ﻿import { useEffect, useState } from "react";
-import { useLocation, useParams } from "react-router-dom";
+import { useLocation, useNavigate, useParams } from "react-router-dom";
 import CameraCapture from "@/components/capture/CameraCapture";
 import inspectionService from "@/services/inspectionService";
 import { getCurrentLocation, sha256Blob } from "@/utils/captureEvidence";
@@ -9,6 +9,7 @@ import { getCaptureTelemetry } from "@/utils/captureTelemetry";
 export default function CaptureScreen() {
   const { id } = useParams<{ id: string }>();
   const location = useLocation();
+  const navigate = useNavigate();
   const phase = location.pathname.includes("/return") ? "return" : "baseline";
   const [areas, setAreas] = useState<string[]>([]);
   const [currentAreaIndex, setCurrentAreaIndex] = useState(0);
@@ -126,6 +127,13 @@ export default function CaptureScreen() {
         <p className="mt-2 text-sm text-[var(--text-secondary)]">
           Evidence recorded for all areas.
         </p>
+        <button
+          type="button"
+          className="btn btn-primary mt-5 w-full"
+          onClick={() => navigate(phase === "return" ? `/inspections/${id}/compare` : `/inspections/${id}/review`)}
+        >
+          {phase === "return" ? "Review comparison" : "Review baseline"}
+        </button>
       </main>
     );
   }

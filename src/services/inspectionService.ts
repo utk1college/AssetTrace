@@ -57,6 +57,28 @@ export interface EvidenceMetadata {
   suspicious: boolean;
 }
 
+export type ComparisonStatus =
+  | "Existing"
+  | "New"
+  | "Uncertain"
+  | "No visible change";
+
+export interface ComparisonChange {
+  areaId: string;
+  category: string;
+  status: ComparisonStatus;
+  confidence: number;
+  explanation: string;
+}
+
+export interface Comparison {
+  comparisonId: string;
+  inspectionId: string;
+  status: "complete";
+  result: { changes: ComparisonChange[] };
+  createdAt: string;
+}
+
 export interface Inspection {
   id: string;
   sessionCode: string;
@@ -101,6 +123,10 @@ export interface InspectionService {
     inspectionId: string,
     request: SaveEvidenceRequest,
   ): Promise<EvidenceMetadata>;
+  listEvidence(
+    inspectionId: string,
+    phase?: EvidencePhase,
+  ): Promise<EvidenceMetadata[]>;
   uploadEvidence(
     uploadUrl: string,
     file: Blob,
@@ -108,6 +134,12 @@ export interface InspectionService {
   ): Promise<void>;
   acknowledgeInspection(id: string, userId: string): Promise<Inspection>;
   lockInspection(id: string): Promise<Inspection>;
+  compareInspection(
+    inspectionId: string,
+    baselineEvidence: EvidenceMetadata[],
+    returnEvidence: EvidenceMetadata[],
+  ): Promise<Comparison>;
+  getLatestComparison(inspectionId: string): Promise<Comparison | null>;
 }
 
 export default inspectionService;

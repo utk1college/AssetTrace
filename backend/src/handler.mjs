@@ -85,7 +85,7 @@ async function readInspection(event) {
 
 async function listInspections(event) {
   const userId = userIdOf(event)
-  const result = await dynamodb.send(new ScanCommand({ TableName: config.inspectionsTable, FilterExpression: '#ownerId = :ownerId', ExpressionAttributeNames: { '#ownerId': 'ownerId' }, ExpressionAttributeValues: { ':ownerId': { S: userId } } }))
+  const result = await dynamodb.send(new ScanCommand({ TableName: config.inspectionsTable, FilterExpression: '#ownerId = :userId OR #renterId = :userId', ExpressionAttributeNames: { '#ownerId': 'ownerId', '#renterId': 'renterId' }, ExpressionAttributeValues: { ':userId': { S: userId } } }))
   return ok((result.Items ?? []).map(unmarshall))
 }
 
@@ -148,6 +148,25 @@ async function saveEvidence(event) {
     await dynamodb.send(new UpdateItemCommand({ TableName: config.inspectionsTable, Key: marshall({ inspectionId: id, sk: item.sk }), UpdateExpression: 'SET completedAreaIds = list_append(if_not_exists(completedAreaIds, :empty), :area), updatedAt = :updatedAt', ExpressionAttributeValues: marshall({ ':empty': [], ':area': [input.areaId], ':updatedAt': new Date().toISOString() }) }))
   }
   return ok(evidence, 201)
+}
+
+async function listEvidence(event) {
+  const id = event.pathParameters?.id; const item = await getInspection(id)
+  if (!item) return fail(404, 'NOT_FOUND', 'Inspection not found')
+  if (![item.ownerId, item.renterId].includes(userIdOf(event))) return fail(403, 'FORBIDDEN', 'You do not have access to this inspection')
+  const result = await dynamodb.send(new ScanCommand({ TableName: config.evidenceTable, FilterExpression: 'inspectionId = :inspectionId', ExpressionAttributeValues: { ':inspectionId': { S: id } } }))
+  const phase = event.queryStringParameters?.phase
+  const evidence = (result.Items ?? []).map(unmarshall).filter((item) => !phase || item.phase === phase).sort((left, right) => left.createdAt.localeCompare(right.createdAt))
+  return ok(evidence)
+}
+
+async function latestComparison(event) {
+  const id = event.pathParameters?.id; const item = await getInspection(id)
+  if (!item) return fail(404, 'NOT_FOUND', 'Inspection not found')
+  if (![item.ownerId, item.renterId].includes(userIdOf(event))) return fail(403, 'FORBIDDEN', 'You do not have access to this inspection')
+  const result = await dynamodb.send(new ScanCommand({ TableName: config.comparisonsTable, FilterExpression: 'inspectionId = :inspectionId', ExpressionAttributeValues: { ':inspectionId': { S: id } } }))
+  const comparisons = (result.Items ?? []).map(unmarshall).sort((left, right) => right.createdAt.localeCompare(left.createdAt))
+  return comparisons.length ? ok(comparisons[0]) : fail(404, 'COMPARISON_NOT_FOUND', 'No comparison is available yet')
 }
 
 function validateComparisonInput(input) {
@@ -240,9 +259,11 @@ export async function handler(event) {
     if (route === 'POST /inspections/{id}/join') return await joinInspection(event)
     if (route === 'POST /inspections/{id}/evidence/upload-url') return await uploadUrl(event)
     if (route === 'POST /inspections/{id}/evidence') return await saveEvidence(event)
+    if (route === 'GET /inspections/{id}/evidence') return await listEvidence(event)
     if (route === 'POST /inspections/{id}/acknowledge') return await acknowledge(event)
     if (route === 'POST /inspections/{id}/lock') return await lock(event)
     if (route === 'POST /inspections/{id}/compare') return await compare(event)
+    if (route === 'GET /inspections/{id}/compare') return await latestComparison(event)
     return fail(404, 'NOT_FOUND', 'Route not found')
   } catch (error) {
     console.error('request_failed', { error: error.message, code: error.code, route: event.routeKey })

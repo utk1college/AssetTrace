@@ -8,6 +8,8 @@ import type {
   EvidenceMetadata,
   EvidenceUploadRequest,
   EvidenceUploadResponse,
+  Comparison,
+  EvidencePhase,
   Inspection,
   SaveEvidenceRequest,
 } from "../inspectionService";
@@ -15,6 +17,7 @@ import authService from "../authService";
 
 const STORAGE_KEY = "assettrace.inspections";
 const EVIDENCE_STORAGE_KEY = "assettrace.evidence";
+const COMPARISON_STORAGE_KEY = "assettrace.comparisons";
 const MOCK_OWNER_ID = "mock-owner-1";
 const MOCK_RENTER_ID = "mock-renter-1";
 const MOCK_DELAY = 300;
@@ -71,6 +74,21 @@ function readEvidence(): EvidenceMetadata[] {
 
 function writeEvidence(evidence: EvidenceMetadata[]): void {
   localStorage.setItem(EVIDENCE_STORAGE_KEY, JSON.stringify(evidence));
+}
+
+function readComparisons(): Comparison[] {
+  const stored = localStorage.getItem(COMPARISON_STORAGE_KEY);
+  if (!stored) return [];
+  try {
+    const parsed: unknown = JSON.parse(stored);
+    return Array.isArray(parsed) ? (parsed as Comparison[]) : [];
+  } catch {
+    return [];
+  }
+}
+
+function writeComparisons(comparisons: Comparison[]): void {
+  localStorage.setItem(COMPARISON_STORAGE_KEY, JSON.stringify(comparisons));
 }
 
 function createId(): string {
@@ -308,6 +326,15 @@ export async function saveEvidence(
   return evidence;
 }
 
+export async function listEvidence(
+  inspectionId: string,
+  phase?: EvidencePhase,
+): Promise<EvidenceMetadata[]> {
+  await delay();
+  const evidence = readEvidence().filter((item) => item.inspectionId === inspectionId);
+  return phase ? evidence.filter((item) => item.phase === phase) : evidence;
+}
+
 export async function uploadEvidence(
   uploadUrl: string,
   file: Blob,
@@ -379,4 +406,50 @@ export async function lockInspection(id: string): Promise<Inspection> {
   inspections[index] = next;
   writeInspections(inspections);
   return next;
+}
+
+export async function compareInspection(
+  inspectionId: string,
+  baselineEvidence: EvidenceMetadata[],
+  returnEvidence: EvidenceMetadata[],
+): Promise<Comparison> {
+  await delay();
+  const inspection = await getInspection(inspectionId);
+  if (inspection.status !== "locked") {
+    throw new Error("The baseline must be locked before comparison.");
+  }
+  if (!baselineEvidence.length || !returnEvidence.length) {
+    throw new Error("Baseline and return evidence are required.");
+  }
+
+  const returnAreas = new Set(returnEvidence.map((item) => item.areaId));
+  const changes = baselineEvidence.map((item) => ({
+    areaId: item.areaId,
+    category: "Condition",
+    status: returnAreas.has(item.areaId) ? ("No visible change" as const) : ("Uncertain" as const),
+    confidence: returnAreas.has(item.areaId) ? 0.5 : 0.2,
+    explanation: returnAreas.has(item.areaId)
+      ? "Mock comparison requires human review of the matched evidence."
+      : "No matching return evidence was found for this area.",
+  }));
+  const comparison: Comparison = {
+    comparisonId: createId(),
+    inspectionId,
+    status: "complete",
+    result: { changes },
+    createdAt: new Date().toISOString(),
+  };
+  writeComparisons([comparison, ...readComparisons()]);
+  return comparison;
+}
+
+export async function getLatestComparison(
+  inspectionId: string,
+): Promise<Comparison | null> {
+  await delay();
+  return (
+    readComparisons()
+      .filter((comparison) => comparison.inspectionId === inspectionId)
+      .sort((left, right) => right.createdAt.localeCompare(left.createdAt))[0] ?? null
+  );
 }

@@ -171,6 +171,13 @@ Resources:
             Path: "/inspections/{id}/evidence"
             Method: POST
 
+        ListEvidence:
+          Type: HttpApi
+          Properties:
+            ApiId: !Ref AssetTraceApi
+            Path: "/inspections/{id}/evidence"
+            Method: GET
+
         Acknowledge:
           Type: HttpApi
           Properties:
@@ -191,6 +198,13 @@ Resources:
             ApiId: !Ref AssetTraceApi
             Path: "/inspections/{id}/compare"
             Method: POST
+
+        LatestComparison:
+          Type: HttpApi
+          Properties:
+            ApiId: !Ref AssetTraceApi
+            Path: "/inspections/{id}/compare"
+            Method: GET
 
 Outputs:
 

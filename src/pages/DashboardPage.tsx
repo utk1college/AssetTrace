@@ -25,32 +25,12 @@ const ASSET_ICONS: Record<AssetType, LucideIcon> = {
   apartment: Building2,
   house: House,
 }
-
 const ASSET_LABELS: Record<AssetType, string> = {
   scooter: 'Scooter',
   bike: 'Bike',
   apartment: 'Apartment',
   house: 'House',
 }
-
-const mockReports = [
-  {
-    id: '3',
-    assetType: 'Bike',
-    assetName: 'Royal Enfield',
-    otherParty: 'Amit Patel',
-    completedAt: '2 days ago',
-    changesDetected: 0,
-  },
-  {
-    id: '4',
-    assetType: 'Studio Apartment',
-    assetName: 'Studio HSR Layout',
-    otherParty: 'Sneha Reddy',
-    completedAt: '8 days ago',
-    changesDetected: 2,
-  },
-]
 
 export default function DashboardPage() {
   const user = useAuthStore((state) => state.user)
@@ -166,26 +146,6 @@ useEffect(() => {
           )}
         </section>
 
-        <section
-          id="reports"
-          aria-labelledby="recent-reports"
-        >
-          <h2
-            id="recent-reports"
-            className="section-label mb-3"
-          >
-            RECENT REPORTS
-          </h2>
-
-          <div className="space-y-3">
-            {mockReports.map((report) => (
-              <ReportCard
-                key={report.id}
-                report={report}
-              />
-            ))}
-          </div>
-        </section>
       </div>
     </div>
   )
@@ -316,61 +276,4 @@ function formatInspectionType(
     case 'handover':
       return 'Handover'
   }
-}
-
-function ReportCard({
-  report,
-}: {
-  report: (typeof mockReports)[number]
-}) {
-  const iconMap: Record<string, LucideIcon> = {
-    Bike,
-    'Studio Apartment': Building2,
-  }
-
-  const Icon = iconMap[report.assetType] ?? House
-
-  return (
-    <Link
-      to={`/inspections/${report.id}/report`}
-      className="block card-interactive p-4 no-underline"
-    >
-      <div className="flex items-center gap-3">
-        <span className="asset-icon">
-          <Icon aria-hidden="true" />
-        </span>
-
-        <div className="min-w-0 flex-1">
-          <p className="text-subheading truncate">
-            {report.assetName}
-          </p>
-
-          <p className="text-small truncate">
-            {report.assetType} · {report.otherParty}
-          </p>
-        </div>
-
-        <ChevronRight
-          className="h-5 w-5 shrink-0 text-[var(--text-tertiary)]"
-          aria-hidden="true"
-        />
-      </div>
-
-      <div className="mt-3 flex items-center justify-between">
-        <span className="text-tiny">
-          Completed {report.completedAt}
-        </span>
-
-        {report.changesDetected > 0 ? (
-          <span className="badge badge-warning">
-            {report.changesDetected} changes to review
-          </span>
-        ) : (
-          <span className="text-small status-success">
-            No changes observed
-          </span>
-        )}
-      </div>
-    </Link>
-  )
 }

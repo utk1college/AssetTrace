@@ -97,9 +97,11 @@ Invalid or nonexistent users return a controlled `INVALID_CREDENTIALS` error ins
 | POST | `/inspections/{id}/join` | Join by session code | Verified |
 | POST | `/inspections/{id}/evidence/upload-url` | Create a short-lived S3 upload URL | Verified |
 | POST | `/inspections/{id}/evidence` | Save evidence metadata after upload | Verified |
+| GET | `/inspections/{id}/evidence` | List persisted evidence, optionally filtered by `phase` | Implemented locally; deployment pending |
 | POST | `/inspections/{id}/acknowledge` | Record a party acknowledgement | Verified |
 | POST | `/inspections/{id}/lock` | Lock after both parties acknowledge | Verified |
 | POST | `/inspections/{id}/compare` | Run before/after AI comparison | Pending live verification |
+| GET | `/inspections/{id}/compare` | Retrieve the latest persisted comparison | Implemented locally; deployment pending |
 
 ## Verified inspection flow
 
@@ -184,6 +186,8 @@ The intended flow is:
 6. Validate and persist the structured result in `AssetTrace-Comparisons`.
 
 The live `/compare` inference call, comparison persistence/retrieval, and changed-versus-unchanged image tests are still pending. Do not mark them complete until tested with real S3 evidence.
+
+The frontend now consumes the evidence-list and latest-comparison contracts in both mock and real adapters. Mock comparison is deterministic and review-only; real comparison remains an explicit user action because it invokes Bedrock. The backend save-evidence path now records completed baseline areas, and inspection listing includes both owners and renters. These backend changes are implemented locally but have not been deployed or exercised against AWS in this session.
 
 ## Verification checklist
 

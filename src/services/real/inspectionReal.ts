@@ -2,6 +2,8 @@ import { INSPECTION_AREAS } from "@/config/constants";
 import { isValidDeployedSessionCode } from "@/utils/sessionCode";
 import { REAL_ACCESS_TOKEN_KEY } from "./authReal";
 import type {
+  Comparison,
+  ComparisonStatus,
   CreateInspectionInput,
   EvidenceMetadata,
   EvidenceUploadRequest,
@@ -164,6 +166,49 @@ function inspectionFromApi(value: ApiInspection): Inspection {
   };
 }
 
+function comparisonFromApi(value: unknown): Comparison {
+  const record = value as Partial<Comparison>;
+  if (
+    typeof record.comparisonId !== "string" ||
+    typeof record.inspectionId !== "string" ||
+    record.status !== "complete" ||
+    typeof record.createdAt !== "string" ||
+    !record.result ||
+    !Array.isArray(record.result.changes)
+  ) {
+    throw new Error("Comparison response is invalid.");
+  }
+
+  const changes = record.result.changes.map((change) => {
+    const candidate = change as unknown as Record<string, unknown>;
+    const status = candidate.status as ComparisonStatus;
+    if (
+      typeof candidate.areaId !== "string" ||
+      typeof candidate.category !== "string" ||
+      !["Existing", "New", "Uncertain", "No visible change"].includes(status) ||
+      typeof candidate.confidence !== "number" ||
+      typeof candidate.explanation !== "string"
+    ) {
+      throw new Error("Comparison response contains an invalid change.");
+    }
+    return {
+      areaId: candidate.areaId,
+      category: candidate.category,
+      status,
+      confidence: candidate.confidence,
+      explanation: candidate.explanation,
+    };
+  });
+
+  return {
+    comparisonId: record.comparisonId,
+    inspectionId: record.inspectionId,
+    status: "complete",
+    result: { changes },
+    createdAt: record.createdAt,
+  };
+}
+
 export async function createInspection(
   input: CreateInspectionInput,
 ): Promise<Inspection> {
@@ -267,6 +312,17 @@ export async function saveEvidence(
   return response;
 }
 
+export async function listEvidence(
+  inspectionId: string,
+  phase?: "baseline" | "return",
+): Promise<EvidenceMetadata[]> {
+  const query = phase ? `?phase=${encodeURIComponent(phase)}` : "";
+  const response = await request<unknown[]>(
+    `/inspections/${encodeURIComponent(inspectionId)}/evidence${query}`,
+  );
+  return response as EvidenceMetadata[];
+}
+
 export async function acknowledgeInspection(
   id: string,
   _userId: string,
@@ -284,4 +340,35 @@ export async function lockInspection(id: string): Promise<Inspection> {
     { method: "POST", body: JSON.stringify({}) },
   );
   return inspectionFromApi(response);
+}
+
+export async function compareInspection(
+  inspectionId: string,
+  baselineEvidence: EvidenceMetadata[],
+  returnEvidence: EvidenceMetadata[],
+): Promise<Comparison> {
+  const response = await request<unknown>(
+    `/inspections/${encodeURIComponent(inspectionId)}/compare`,
+    {
+      method: "POST",
+      body: JSON.stringify({ baselineEvidence, returnEvidence }),
+    },
+  );
+  return comparisonFromApi(response);
+}
+
+export async function getLatestComparison(
+  inspectionId: string,
+): Promise<Comparison | null> {
+  try {
+    const response = await request<unknown>(
+      `/inspections/${encodeURIComponent(inspectionId)}/compare`,
+    );
+    return comparisonFromApi(response);
+  } catch (error) {
+    if (error instanceof Error && error.message === "No comparison is available yet") {
+      return null;
+    }
+    throw error;
+  }
 }
