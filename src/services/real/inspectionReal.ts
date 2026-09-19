@@ -27,6 +27,8 @@ interface ApiInspection {
   areas?: unknown;
   completedAreaIds?: unknown;
   createdAt?: unknown;
+  acknowledgements?: unknown
+  lockedAt?: unknown
 }
 
 const endpoint = import.meta.env.VITE_API_ENDPOINT?.trim();
@@ -135,6 +137,15 @@ function inspectionFromApi(value: ApiInspection): Inspection {
         (area): area is string => typeof area === "string",
       )
     : [];
+  const acknowledgements =
+  value.acknowledgements && typeof value.acknowledgements === "object"
+      ? Object.fromEntries(
+          Object.entries(value.acknowledgements).filter(
+            ([userId, timestamp]) =>
+              Boolean(userId) && typeof timestamp === "string" && Boolean(timestamp),
+          ),
+        )
+      : undefined;
 
   return {
     id: stringField(value.id ?? value.inspectionId, "id"),
@@ -148,6 +159,8 @@ function inspectionFromApi(value: ApiInspection): Inspection {
     areas,
     completedAreaIds,
     createdAt: stringField(value.createdAt, "createdAt"),
+    acknowledgements,
+    lockedAt: typeof value.lockedAt === "string" ? value.lockedAt : undefined,
   };
 }
 
@@ -252,4 +265,23 @@ export async function saveEvidence(
   );
 
   return response;
+}
+
+export async function acknowledgeInspection(
+  id: string,
+  _userId: string,
+): Promise<Inspection> {
+  const response = await request<ApiInspection>(
+    `/inspections/${encodeURIComponent(id)}/acknowledge`,
+    { method: "POST", body: JSON.stringify({}) },
+  );
+  return inspectionFromApi(response);
+}
+
+export async function lockInspection(id: string): Promise<Inspection> {
+  const response = await request<ApiInspection>(
+    `/inspections/${encodeURIComponent(id)}/lock`,
+    { method: "POST", body: JSON.stringify({}) },
+  );
+  return inspectionFromApi(response);
 }

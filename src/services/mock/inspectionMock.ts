@@ -11,6 +11,7 @@ import type {
   Inspection,
   SaveEvidenceRequest,
 } from "../inspectionService";
+import authService from "../authService";
 
 const STORAGE_KEY = "assettrace.inspections";
 const EVIDENCE_STORAGE_KEY = "assettrace.evidence";
@@ -121,7 +122,11 @@ export async function createInspection(
     areas,
     completedAreaIds: [],
     createdAt: new Date().toISOString(),
+    acknowledgements: {},
   };
+
+  const currentUser = await authService.getCurrentUser();
+  if (currentUser) inspection.ownerId = currentUser.id;
 
   inspections.push(inspection);
   writeInspections(inspections);
@@ -170,7 +175,8 @@ export async function joinInspection(sessionCode: string): Promise<Inspection> {
   }
 
   if (!inspection.renterId) {
-    inspection.renterId = MOCK_RENTER_ID;
+    const currentUser = await authService.getCurrentUser();
+    inspection.renterId = currentUser?.id ?? MOCK_RENTER_ID;
     writeInspections(inspections);
   }
 
@@ -284,6 +290,21 @@ export async function saveEvidence(
   allEvidence.push(evidence);
   writeEvidence(allEvidence);
 
+  if (request.phase === "baseline" && !inspection.completedAreaIds.includes(request.areaId)) {
+    const inspections = readInspections();
+    const inspectionIndex = inspections.findIndex((item) => item.id === inspectionId);
+    if (inspectionIndex !== -1) {
+      inspections[inspectionIndex] = {
+        ...inspections[inspectionIndex],
+        completedAreaIds: [
+          ...inspections[inspectionIndex].completedAreaIds,
+          request.areaId,
+        ],
+      };
+      writeInspections(inspections);
+    }
+  }
+
   return evidence;
 }
 
@@ -305,4 +326,57 @@ export async function uploadEvidence(
   if (!contentType.startsWith("image/")) {
     throw new Error("Only image evidence is supported.");
   }
+}
+
+export async function acknowledgeInspection(
+  id: string,
+  userId: string,
+): Promise<Inspection> {
+  await delay();
+  const inspections = readInspections();
+  const index = inspections.findIndex((inspection) => inspection.id === id);
+  if (index === -1) throw new Error("Inspection not found.");
+
+  const current = inspections[index];
+  if (current.status === "locked") throw new Error("This baseline is already locked.");
+  if (userId !== current.ownerId && userId !== current.renterId) {
+    throw new Error("You are not a participant in this inspection.");
+  }
+
+  const next: Inspection = {
+    ...current,
+    status: "awaiting-confirmation",
+    acknowledgements: {
+      ...current.acknowledgements,
+      [userId]: new Date().toISOString(),
+    },
+  };
+  inspections[index] = next;
+  writeInspections(inspections);
+  return next;
+}
+
+export async function lockInspection(id: string): Promise<Inspection> {
+  await delay();
+  const inspections = readInspections();
+  const index = inspections.findIndex((inspection) => inspection.id === id);
+  if (index === -1) throw new Error("Inspection not found.");
+
+  const current = inspections[index];
+  const ownerAcknowledged = Boolean(current.acknowledgements?.[current.ownerId]);
+  const renterAcknowledged = Boolean(
+    current.renterId && current.acknowledgements?.[current.renterId],
+  );
+  if (!ownerAcknowledged || !renterAcknowledged) {
+    throw new Error("Both parties must confirm before the baseline can be locked.");
+  }
+
+  const next: Inspection = {
+    ...current,
+    status: "locked",
+    lockedAt: new Date().toISOString(),
+  };
+  inspections[index] = next;
+  writeInspections(inspections);
+  return next;
 }

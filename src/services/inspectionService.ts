@@ -69,6 +69,8 @@ export interface Inspection {
   areas: string[];
   completedAreaIds: string[];
   createdAt: string;
+  acknowledgements?: Record<string, string>
+  lockedAt?: string
 }
 
 export type CreateInspectionInput = Pick<
@@ -104,6 +106,8 @@ export interface InspectionService {
     file: Blob,
     contentType: string,
   ): Promise<void>;
+  acknowledgeInspection(id: string, userId: string): Promise<Inspection>;
+  lockInspection(id: string): Promise<Inspection>;
 }
 
 export default inspectionService;
