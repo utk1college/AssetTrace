@@ -144,6 +144,9 @@ async function saveEvidence(event) {
   if (!allowedImageTypes.has(contentType)) return fail(400, 'INVALID_CONTENT_TYPE', 'Evidence must be a JPEG, PNG, GIF, or WebP image')
   const evidence = { inspectionId: id, evidenceId: input.evidenceId, entity: 'evidence', ...input, phase, contentType, sizeBytes: uploaded.ContentLength, capturedBy: userIdOf(event), createdAt: new Date().toISOString() }
   await dynamodb.send(new PutItemCommand({ TableName: config.evidenceTable, Item: marshall(evidence, { removeUndefinedValues: true }), ConditionExpression: 'attribute_not_exists(inspectionId) AND attribute_not_exists(evidenceId)' }))
+  if (phase === 'baseline' && !item.completedAreaIds?.includes(input.areaId)) {
+    await dynamodb.send(new UpdateItemCommand({ TableName: config.inspectionsTable, Key: marshall({ inspectionId: id, sk: item.sk }), UpdateExpression: 'SET completedAreaIds = list_append(if_not_exists(completedAreaIds, :empty), :area), updatedAt = :updatedAt', ExpressionAttributeValues: marshall({ ':empty': [], ':area': [input.areaId], ':updatedAt': new Date().toISOString() }) }))
+  }
   return ok(evidence, 201)
 }
 
