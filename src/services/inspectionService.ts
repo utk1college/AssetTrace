@@ -55,6 +55,7 @@ export interface EvidenceMetadata {
     accuracy: number;
   };
   suspicious: boolean;
+  viewUrl?: string;
 }
 
 export type ComparisonStatus =

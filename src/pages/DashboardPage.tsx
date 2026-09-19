@@ -64,6 +64,9 @@ useEffect(() => {
 }, [loadInspections])
 
   const visibleInspections = [...inspections]
+  const lockedInspections = visibleInspections.filter(
+    (inspection) => inspection.status === 'locked',
+  )
 
   if (
     currentInspection &&
@@ -141,6 +144,33 @@ useEffect(() => {
                   inspection={inspection}
                   userRole={user?.role}
                 />
+              ))}
+            </div>
+          )}
+        </section>
+
+        <section id="reports" aria-labelledby="reports-heading">
+          <h2 id="reports-heading" className="section-label mb-3">
+            REPORTS
+          </h2>
+          {lockedInspections.length === 0 ? (
+            <p className="text-small">Locked inspections will appear here.</p>
+          ) : (
+            <div className="space-y-3">
+              {lockedInspections.map((inspection) => (
+                <Link
+                  key={inspection.id}
+                  to={`/inspections/${inspection.id}/report`}
+                  className="block card-interactive p-4 no-underline"
+                >
+                  <div className="flex items-center justify-between gap-3">
+                    <div>
+                      <p className="text-subheading">{inspection.assetName}</p>
+                      <p className="text-small mt-1">Condition report</p>
+                    </div>
+                    <ChevronRight className="h-5 w-5 shrink-0" aria-hidden="true" />
+                  </div>
+                </Link>
               ))}
             </div>
           )}

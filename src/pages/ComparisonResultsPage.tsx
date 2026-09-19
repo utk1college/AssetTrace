@@ -5,9 +5,11 @@ import LoadingState from "@/components/feedback/LoadingState";
 import SecondaryButton from "@/components/ui/SecondaryButton";
 import PrimaryButton from "@/components/ui/PrimaryButton";
 import inspectionService, { type Comparison, type EvidenceMetadata, type Inspection } from "@/services/inspectionService";
+import { useAuthStore } from "@/store/authStore";
 
 export default function ComparisonResultsPage() {
   const { id = "" } = useParams();
+  const user = useAuthStore((state) => state.user);
   const [inspection, setInspection] = useState<Inspection | null>(null);
   const [baseline, setBaseline] = useState<EvidenceMetadata[]>([]);
   const [returned, setReturned] = useState<EvidenceMetadata[]>([]);
@@ -63,7 +65,7 @@ export default function ComparisonResultsPage() {
       <section className="card space-y-3 p-4">
         <div className="flex justify-between gap-3"><span className="text-body">Baseline evidence</span><strong>{baseline.length}</strong></div>
         <div className="flex justify-between gap-3"><span className="text-body">Return evidence</span><strong>{returned.length}</strong></div>
-        <PrimaryButton fullWidth onClick={() => void runComparison()} disabled={isComparing || !baseline.length || !returned.length || inspection.status !== "locked"}><Search className="h-5 w-5" aria-hidden="true" />{isComparing ? "Comparing evidence" : comparison ? "Run comparison again" : "Compare evidence"}</PrimaryButton>
+        {user?.id === inspection.ownerId ? <PrimaryButton fullWidth onClick={() => void runComparison()} disabled={isComparing || !baseline.length || !returned.length || inspection.status !== "locked"}><Search className="h-5 w-5" aria-hidden="true" />{isComparing ? "Comparing evidence" : comparison ? "Run comparison again" : "Compare evidence"}</PrimaryButton> : <p className="text-small">The owner will compare the return evidence and publish the report.</p>}
         {inspection.status !== "locked" && <p className="text-small">Lock the baseline before comparing evidence.</p>}
         {(!baseline.length || !returned.length) && <p className="text-small">Both baseline and return evidence are required.</p>}
       </section>

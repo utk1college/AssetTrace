@@ -5,11 +5,13 @@ import inspectionService from "@/services/inspectionService";
 import { getCurrentLocation, sha256Blob } from "@/utils/captureEvidence";
 
 import { getCaptureTelemetry } from "@/utils/captureTelemetry";
+import { useAuthStore } from "@/store/authStore";
 
 export default function CaptureScreen() {
   const { id } = useParams<{ id: string }>();
   const location = useLocation();
   const navigate = useNavigate();
+  const user = useAuthStore((state) => state.user);
   const phase = location.pathname.includes("/return") ? "return" : "baseline";
   const [areas, setAreas] = useState<string[]>([]);
   const [currentAreaIndex, setCurrentAreaIndex] = useState(0);
@@ -30,6 +32,15 @@ export default function CaptureScreen() {
       void inspectionService
         .getInspection(id)
         .then((inspection) => {
+          const canCapture = phase === "baseline"
+            ? user?.id === inspection.ownerId
+            : user?.id === inspection.renterId;
+          if (!canCapture) {
+            setError(phase === "baseline"
+              ? "Only the owner can record the baseline evidence."
+              : "Only the renter can record return evidence.");
+            return;
+          }
           if (phase === "return" && inspection.status !== "locked") {
             setError(
               "Return evidence can only be captured after the baseline is locked.",
@@ -52,7 +63,7 @@ export default function CaptureScreen() {
     return () => {
       window.clearTimeout(timer);
     };
-  }, [id, phase]);
+  }, [id, phase, user?.id]);
 
   async function saveEvidence(file: Blob) {
     const areaId = areas[currentAreaIndex];

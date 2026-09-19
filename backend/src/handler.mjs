@@ -48,7 +48,7 @@ const allowedImageTypes = new Map([
   ['image/webp', 'webp'],
 ])
 const maxImageBytes = 25 * 1024 * 1024
-const maxImagesPerSide = 10
+const maxImagesPerSide = 20
 const sessionCodeCharacters = 'ACDEFGHJKLMNPQRTUVWXYZ234679'
 
 function generateSessionCode() {
@@ -102,9 +102,10 @@ async function joinInspection(event) {
 async function acknowledge(event) {
   const id = event.pathParameters?.id; const item = await getInspection(id); const userId = userIdOf(event)
   if (!item) return fail(404, 'NOT_FOUND', 'Inspection not found'); if (![item.ownerId, item.renterId].includes(userId)) return fail(403, 'FORBIDDEN', 'You do not have access to this inspection')
+  if (item.completedAreaIds?.length < item.areas?.length) return fail(409, 'EVIDENCE_REQUIRED', 'All baseline areas must be captured before confirmation')
   const acknowledgements = { ...(item.acknowledgements ?? {}), [userId]: new Date().toISOString() }
-  await dynamodb.send(new UpdateItemCommand({ TableName: config.inspectionsTable, Key: marshall({ inspectionId: id, sk: item.sk }), UpdateExpression: 'SET acknowledgements = :ack, updatedAt = :updatedAt', ExpressionAttributeValues: marshall({ ':ack': acknowledgements, ':updatedAt': new Date().toISOString() }) }))
-  return ok({ ...item, acknowledgements })
+  await dynamodb.send(new UpdateItemCommand({ TableName: config.inspectionsTable, Key: marshall({ inspectionId: id, sk: item.sk }), UpdateExpression: 'SET acknowledgements = :ack, #status = :status, updatedAt = :updatedAt', ExpressionAttributeNames: { '#status': 'status' }, ExpressionAttributeValues: marshall({ ':ack': acknowledgements, ':status': 'awaiting-confirmation', ':updatedAt': new Date().toISOString() }) }))
+  return ok({ ...item, acknowledgements, status: 'awaiting-confirmation' })
 }
 
 async function lock(event) {
@@ -122,7 +123,11 @@ async function uploadUrl(event) {
   if (![item.ownerId, item.renterId].includes(userIdOf(event))) return fail(403, 'FORBIDDEN', 'You do not have access to this inspection')
   const input = bodyOf(event); requireFields(input, ['areaId', 'contentType']);
   const phase = input.phase ?? (item.status === 'locked' ? 'return' : 'baseline')
+  const userId = userIdOf(event)
+  if (phase === 'baseline' && userId !== item.ownerId) return fail(403, 'OWNER_ONLY', 'Only the owner can upload baseline evidence')
+  if (phase === 'return' && userId !== item.renterId) return fail(403, 'RENTER_ONLY', 'Only the renter can upload return evidence')
   if (!allowedEvidencePhases.has(phase)) return fail(400, 'INVALID_PHASE', 'Evidence phase must be baseline or return')
+  if (phase === 'return' && item.status !== 'locked') return fail(409, 'BASELINE_REQUIRED', 'The baseline must be locked before return evidence can be uploaded')
   if (item.status === 'locked' && phase === 'baseline') return fail(409, 'INSPECTION_LOCKED', 'Baseline evidence cannot be changed after locking')
   if (!allowedImageTypes.has(input.contentType)) return fail(400, 'INVALID_CONTENT_TYPE', 'Evidence must be a JPEG, PNG, GIF, or WebP image')
   const evidenceId = randomUUID(); const key = `inspections/${id}/${evidenceId}`
@@ -135,7 +140,11 @@ async function saveEvidence(event) {
   if (![item.ownerId, item.renterId].includes(userIdOf(event))) return fail(403, 'FORBIDDEN', 'You do not have access to this inspection')
   const input = bodyOf(event); requireFields(input, ['evidenceId', 'areaId', 'key', 'sha256', 'capturedAt'])
   const phase = input.phase ?? (item.status === 'locked' ? 'return' : 'baseline')
+  const userId = userIdOf(event)
+  if (phase === 'baseline' && userId !== item.ownerId) return fail(403, 'OWNER_ONLY', 'Only the owner can save baseline evidence')
+  if (phase === 'return' && userId !== item.renterId) return fail(403, 'RENTER_ONLY', 'Only the renter can save return evidence')
   if (!allowedEvidencePhases.has(phase)) return fail(400, 'INVALID_PHASE', 'Evidence phase must be baseline or return')
+  if (phase === 'return' && item.status !== 'locked') return fail(409, 'BASELINE_REQUIRED', 'The baseline must be locked before return evidence can be saved')
   if (item.status === 'locked' && phase === 'baseline') return fail(409, 'INSPECTION_LOCKED', 'Baseline evidence cannot be changed after locking')
   const expectedPrefix = `inspections/${id}/`
   if (typeof input.key !== 'string' || !input.key.startsWith(expectedPrefix)) return fail(400, 'INVALID_EVIDENCE_KEY', 'Evidence key does not belong to this inspection')
@@ -157,7 +166,8 @@ async function listEvidence(event) {
   const result = await dynamodb.send(new ScanCommand({ TableName: config.evidenceTable, FilterExpression: 'inspectionId = :inspectionId', ExpressionAttributeValues: { ':inspectionId': { S: id } } }))
   const phase = event.queryStringParameters?.phase
   const evidence = (result.Items ?? []).map(unmarshall).filter((item) => !phase || item.phase === phase).sort((left, right) => left.createdAt.localeCompare(right.createdAt))
-  return ok(evidence)
+  const withViewUrls = await Promise.all(evidence.map(async (record) => ({ ...record, viewUrl: await getSignedUrl(s3, new GetObjectCommand({ Bucket: config.bucket, Key: record.key }), { expiresIn: 900 }) })))
+  return ok(withViewUrls)
 }
 
 async function latestComparison(event) {
@@ -215,7 +225,7 @@ function parseComparison(text) {
 
 async function compare(event) {
   const id = event.pathParameters?.id; const item = await getInspection(id); if (!item) return fail(404, 'NOT_FOUND', 'Inspection not found')
-  if (![item.ownerId, item.renterId].includes(userIdOf(event))) return fail(403, 'FORBIDDEN', 'You do not have access to this inspection')
+  if (userIdOf(event) !== item.ownerId) return fail(403, 'OWNER_ONLY', 'Only the owner can run the comparison')
   if (item.status !== 'locked') return fail(409, 'BASELINE_NOT_LOCKED', 'The baseline must be locked before comparison')
   const input = bodyOf(event); validateComparisonInput(input)
   const content = [{ text: 'You are comparing rental inspection photographs. Inspect the actual images, match baseline and return images by area, and report only visible changes. Return ONLY valid JSON, with no Markdown or extra text, in this exact shape: {"changes":[{"areaId":"string","category":"string","status":"Existing|New|Uncertain|No visible change","confidence":0.0,"explanation":"string"}]}. Confidence must be between 0 and 1. Do not claim legal validity. If an area cannot be confidently compared, use Uncertain.' }]

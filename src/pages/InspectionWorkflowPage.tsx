@@ -15,6 +15,7 @@ import LoadingState from '@/components/feedback/LoadingState'
 import PrimaryButton from '@/components/ui/PrimaryButton'
 import { useInspectionStore } from '@/store/inspectionStore'
 import type { AssetType, Inspection } from '@/services/inspectionService'
+import { useAuthStore } from '@/store/authStore'
 
 const ASSET_ICONS: Record<AssetType, LucideIcon> = {
   scooter: Bike,
@@ -33,6 +34,7 @@ const ASSET_LABELS: Record<AssetType, string> = {
 export default function InspectionWorkflowPage() {
   const { id } = useParams<{ id: string }>()
   const navigate = useNavigate()
+  const user = useAuthStore((state) => state.user)
 
   const inspection = useInspectionStore(
     (state) => state.currentInspection,
@@ -101,7 +103,7 @@ export default function InspectionWorkflowPage() {
   const completedAreas = inspection.completedAreaIds.length
   const totalAreas = inspection.areas.length
 
-  const nextAction = getNextAction(inspection)
+  const nextAction = getNextAction(inspection, user?.id)
 
   return (
     <div className="min-h-screen bg-[var(--surface)] pb-24">
@@ -220,6 +222,7 @@ export default function InspectionWorkflowPage() {
 
 function getNextAction(
   inspection: Inspection,
+  userId?: string,
 ): {
   label: string
   path: string
@@ -233,15 +236,17 @@ function getNextAction(
 
     case 'locked':
       return {
-        label: 'Start return inspection',
+        label: userId === inspection.renterId ? 'Record return condition' : 'Review return condition',
         path: `/inspections/${inspection.id}/return`,
       }
 
     case 'in-progress':
     default:
       return {
-        label: 'Continue inspection',
-        path: `/inspections/${inspection.id}/capture`,
+        label: userId === inspection.ownerId ? 'Record baseline condition' : 'Review baseline condition',
+        path: userId === inspection.ownerId
+          ? `/inspections/${inspection.id}/capture`
+          : `/inspections/${inspection.id}/review`,
       }
   }
 }

@@ -2,7 +2,6 @@ import { useCallback, useEffect, useState } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
 import { ArrowRight, RefreshCw } from "lucide-react";
 import LoadingState from "@/components/feedback/LoadingState";
-import EvidenceCard from "@/components/evidence/EvidenceCard";
 import VerificationStatus from "@/components/evidence/VerificationStatus";
 import PrimaryButton from "@/components/ui/PrimaryButton";
 import SecondaryButton from "@/components/ui/SecondaryButton";
@@ -15,7 +14,6 @@ export default function InspectionReviewPage() {
   const [evidence, setEvidence] = useState<EvidenceMetadata[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-
   const load = useCallback(async () => {
     if (!id) return;
     setIsLoading(true);
@@ -33,14 +31,13 @@ export default function InspectionReviewPage() {
       setIsLoading(false);
     }
   }, [id]);
-
   useEffect(() => { void load(); }, [load]);
 
   if (isLoading) return <LoadingState label="Loading inspection evidence" />;
   if (!inspection) return <main className="container py-8"><div className="card p-5" role="alert"><h1 className="text-display">We couldn’t load this inspection</h1><p className="text-body mt-2">{error ?? "Inspection not found."}</p><SecondaryButton className="mt-5" onClick={() => void load()}><RefreshCw className="h-4 w-4" aria-hidden="true" />Try again</SecondaryButton></div></main>;
+
   const capturedAreas = new Set(evidence.map((item) => item.areaId));
   const capturedCount = inspection.areas.filter((area) => capturedAreas.has(area)).length;
   const progress = inspection.areas.length ? Math.round((capturedCount / inspection.areas.length) * 100) : 0;
-
-  return <main className="container space-y-8 py-6"><header><p className="section-label">EVIDENCE REVIEW</p><h1 className="text-display mt-1">Review {inspection.assetName}</h1><p className="text-body mt-2">Check each captured area before both parties confirm the baseline.</p></header>{error && <div className="card p-4 text-small text-[var(--error)]" role="alert">{error}</div>}<section className="card space-y-4 p-4"><div className="flex items-baseline justify-between gap-3"><h2 className="text-subheading">Captured-area progress</h2><span className="text-small">{capturedCount} of {inspection.areas.length} areas · {progress}%</span></div><div className="progress-container" aria-label={`${progress}% of areas captured`}><div className={`progress-bar ${progress < 100 ? "progress-bar-warning" : ""}`} style={{ width: `${progress}%` }} /></div><p className="text-small">{capturedCount === inspection.areas.length ? "All areas have capture records." : "Complete the remaining areas before confirming."}</p></section><section><div className="mb-2 flex items-center justify-between"><h2 className="text-subheading">Area checklist</h2><span className="text-small">Evidence count: {evidence.length}</span></div><div className="card px-4">{inspection.areas.map((area) => <EvidenceCard key={area} area={area} captured={capturedAreas.has(area)} />)}</div></section><section><h2 className="text-subheading mb-2">Verification status</h2><VerificationStatus hasWarnings={evidence.some((item) => item.suspicious)} /></section><div className="space-y-3"><PrimaryButton fullWidth onClick={() => navigate(`/inspections/${id}/verify`)} disabled={capturedCount < inspection.areas.length}><ArrowRight className="h-5 w-5" aria-hidden="true" />Continue to confirmation</PrimaryButton>{capturedCount < inspection.areas.length && <p className="text-small text-center">Finish capturing all areas to continue.</p>}<Link className="btn btn-secondary w-full" to={`/inspections/${id}`}>Back to inspection</Link></div></main>;
+  return <main className="container space-y-8 py-6"><header><p className="section-label">EVIDENCE REVIEW</p><h1 className="text-display">Review {inspection.assetName}</h1><p className="text-body mt-2">Review each owner photo before confirming the baseline.</p></header>{error && <div className="card p-4 text-small text-[var(--error)]" role="alert">{error}</div>}<section className="card space-y-4 p-4"><div className="flex items-baseline justify-between gap-3"><h2 className="text-subheading">Captured-area progress</h2><span className="text-small">{capturedCount} of {inspection.areas.length} areas · {progress}%</span></div><div className="progress-container" aria-label={`${progress}% of areas captured`}><div className={`progress-bar ${progress < 100 ? "progress-bar-warning" : ""}`} style={{ width: `${progress}%` }} /></div><p className="text-small">{capturedCount === inspection.areas.length ? "All areas have capture records." : "The owner still needs to capture every area."}</p></section><section className="space-y-4"><div className="flex items-center justify-between"><h2 className="text-subheading">Owner evidence</h2><span className="text-small">{evidence.length} photos</span></div>{evidence.map((item) => <figure className="card overflow-hidden" key={item.evidenceId}>{item.viewUrl ? <img src={item.viewUrl} alt={`Baseline evidence for ${item.areaId}`} className="aspect-[4/3] w-full object-cover" /> : <div className="p-5 text-body">Image preview unavailable</div>}<figcaption className="flex items-center justify-between gap-3 p-4"><span className="text-body">{item.areaId}</span><button type="button" className="min-h-12 rounded-lg border border-[var(--border)] px-4 text-small" onClick={() => window.alert("Objection placeholder: this will notify the owner.")}>Raise objection</button></figcaption></figure>)}</section><section><h2 className="text-subheading mb-2">Verification status</h2><VerificationStatus hasWarnings={evidence.some((item) => item.suspicious)} /></section><div className="space-y-3"><PrimaryButton fullWidth onClick={() => navigate(`/inspections/${id}/verify`)} disabled={capturedCount < inspection.areas.length}><ArrowRight className="h-5 w-5" aria-hidden="true" />Submit for locking</PrimaryButton>{capturedCount < inspection.areas.length && <p className="text-small text-center">The owner must finish capturing all areas first.</p>}<Link className="btn btn-secondary w-full" to={`/inspections/${id}`}>Back to inspection</Link></div></main>;
 }

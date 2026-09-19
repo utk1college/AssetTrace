@@ -21,6 +21,7 @@ const COMPARISON_STORAGE_KEY = "assettrace.comparisons";
 const MOCK_OWNER_ID = "mock-owner-1";
 const MOCK_RENTER_ID = "mock-renter-1";
 const MOCK_DELAY = 300;
+const evidenceViewUrls = new Map<string, string>();
 
 function delay(ms = MOCK_DELAY): Promise<void> {
   return new Promise((resolve) => {
@@ -256,6 +257,17 @@ export async function requestEvidenceUploadUrl(
     throw new Error("Area is required.");
   }
 
+  const currentUser = await authService.getCurrentUser();
+  if (request.phase === "baseline" && currentUser?.id !== inspection.ownerId) {
+    throw new Error("Only the owner can upload baseline evidence.");
+  }
+  if (request.phase === "return" && currentUser?.id !== inspection.renterId) {
+    throw new Error("Only the renter can upload return evidence.");
+  }
+  if (request.phase === "return" && inspection.status !== "locked") {
+    throw new Error("The baseline must be locked before return evidence can be uploaded.");
+  }
+
   if (!request.contentType.startsWith("image/")) {
     throw new Error("Only image evidence is supported.");
   }
@@ -283,6 +295,17 @@ export async function saveEvidence(
     throw new Error("Inspection not found.");
   }
 
+  const currentUser = await authService.getCurrentUser();
+  if (request.phase === "baseline" && currentUser?.id !== inspection.ownerId) {
+    throw new Error("Only the owner can save baseline evidence.");
+  }
+  if (request.phase === "return" && currentUser?.id !== inspection.renterId) {
+    throw new Error("Only the renter can save return evidence.");
+  }
+  if (request.phase === "return" && inspection.status !== "locked") {
+    throw new Error("The baseline must be locked before return evidence can be saved.");
+  }
+
   if (!request.evidenceId) {
     throw new Error("Evidence ID is required.");
   }
@@ -301,6 +324,7 @@ export async function saveEvidence(
     capturedAt: request.capturedAt,
     location: request.location,
     suspicious: request.suspicious,
+    viewUrl: evidenceViewUrls.get(request.evidenceId),
   };
 
   const allEvidence = readEvidence();
@@ -353,6 +377,9 @@ export async function uploadEvidence(
   if (!contentType.startsWith("image/")) {
     throw new Error("Only image evidence is supported.");
   }
+
+  const evidenceId = uploadUrl.split("/").pop();
+  if (evidenceId) evidenceViewUrls.set(evidenceId, URL.createObjectURL(file));
 }
 
 export async function acknowledgeInspection(
@@ -366,6 +393,9 @@ export async function acknowledgeInspection(
 
   const current = inspections[index];
   if (current.status === "locked") throw new Error("This baseline is already locked.");
+  if (current.completedAreaIds.length < current.areas.length) {
+    throw new Error("All baseline areas must be captured before confirmation.");
+  }
   if (userId !== current.ownerId && userId !== current.renterId) {
     throw new Error("You are not a participant in this inspection.");
   }
