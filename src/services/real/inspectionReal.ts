@@ -1,38 +1,45 @@
-import { INSPECTION_AREAS } from '@/config/constants'
-import { isValidDeployedSessionCode } from '@/utils/sessionCode'
-import { REAL_ACCESS_TOKEN_KEY } from './authReal'
-import type { CreateInspectionInput, Inspection } from '../inspectionService'
+import { INSPECTION_AREAS } from "@/config/constants";
+import { isValidDeployedSessionCode } from "@/utils/sessionCode";
+import { REAL_ACCESS_TOKEN_KEY } from "./authReal";
+import type {
+  CreateInspectionInput,
+  EvidenceMetadata,
+  EvidenceUploadRequest,
+  EvidenceUploadResponse,
+  Inspection,
+  SaveEvidenceRequest,
+} from "../inspectionService";
 
 interface ApiErrorResponse {
-  error?: { code?: string; message?: string }
+  error?: { code?: string; message?: string };
 }
 
 interface ApiInspection {
-  id?: unknown
-  inspectionId?: unknown
-  sessionCode?: unknown
-  assetType?: unknown
-  assetName?: unknown
-  inspectionType?: unknown
-  status?: unknown
-  ownerId?: unknown
-  renterId?: unknown
-  areas?: unknown
-  completedAreaIds?: unknown
-  createdAt?: unknown
+  id?: unknown;
+  inspectionId?: unknown;
+  sessionCode?: unknown;
+  assetType?: unknown;
+  assetName?: unknown;
+  inspectionType?: unknown;
+  status?: unknown;
+  ownerId?: unknown;
+  renterId?: unknown;
+  areas?: unknown;
+  completedAreaIds?: unknown;
+  createdAt?: unknown;
 }
 
-const endpoint = import.meta.env.VITE_API_ENDPOINT?.trim()
+const endpoint = import.meta.env.VITE_API_ENDPOINT?.trim();
 
 function requireEndpoint(): string {
-  if (!endpoint) throw new Error('Inspection service is not configured yet.')
-  return endpoint.replace(/\/$/, '')
+  if (!endpoint) throw new Error("Inspection service is not configured yet.");
+  return endpoint.replace(/\/$/, "");
 }
 
 function requireToken(): string {
-  const token = window.localStorage.getItem(REAL_ACCESS_TOKEN_KEY)
-  if (!token) throw new Error('Your session has expired. Please log in again.')
-  return token
+  const token = window.localStorage.getItem(REAL_ACCESS_TOKEN_KEY);
+  if (!token) throw new Error("Your session has expired. Please log in again.");
+  return token;
 }
 
 async function request<T>(path: string, init: RequestInit = {}): Promise<T> {
@@ -40,115 +47,143 @@ async function request<T>(path: string, init: RequestInit = {}): Promise<T> {
     ...init,
     headers: {
       Authorization: `Bearer ${requireToken()}`,
-      'Content-Type': 'application/json',
+      "Content-Type": "application/json",
       ...init.headers,
     },
-  })
+  });
 
   if (!response.ok) {
-    const body = (await response.json().catch(() => null)) as ApiErrorResponse | null
-    throw new Error(body?.error?.message ?? 'Inspection request failed. Try again.')
+    const body = (await response
+      .json()
+      .catch(() => null)) as ApiErrorResponse | null;
+    throw new Error(
+      body?.error?.message ?? "Inspection request failed. Try again.",
+    );
   }
 
-  return response.json() as Promise<T>
+  return response.json() as Promise<T>;
+}
+
+async function uploadEvidenceToS3(
+  uploadUrl: string,
+  file: Blob,
+  contentType: string,
+): Promise<void> {
+  const response = await fetch(uploadUrl, {
+    method: "PUT",
+    headers: {
+      "Content-Type": contentType,
+    },
+    body: file,
+  });
+
+  if (!response.ok) {
+    throw new Error("Evidence upload failed. Please try again.");
+  }
+}
+
+export async function uploadEvidence(
+  uploadUrl: string,
+  file: Blob,
+  contentType: string,
+): Promise<void> {
+  await uploadEvidenceToS3(uploadUrl, file, contentType);
 }
 
 function stringField(value: unknown, field: string): string {
-  if (typeof value !== 'string' || !value) {
-    throw new Error(`Inspection response is missing ${field}.`)
+  if (typeof value !== "string" || !value) {
+    throw new Error(`Inspection response is missing ${field}.`);
   }
-  return value
+  return value;
 }
 
 function inspectionFromApi(value: ApiInspection): Inspection {
-  const inspectionType = value.inspectionType
-  const status = value.status
-  const assetType = value.assetType
+  const inspectionType = value.inspectionType;
+  const status = value.status;
+  const assetType = value.assetType;
 
   if (
-    inspectionType !== 'move-in' &&
-    inspectionType !== 'move-out' &&
-    inspectionType !== 'handover'
+    inspectionType !== "move-in" &&
+    inspectionType !== "move-out" &&
+    inspectionType !== "handover"
   ) {
-    throw new Error('Inspection response contains an unsupported inspection type.')
+    throw new Error(
+      "Inspection response contains an unsupported inspection type.",
+    );
   }
   if (
-    status !== 'in-progress' &&
-    status !== 'awaiting-confirmation' &&
-    status !== 'locked'
+    status !== "in-progress" &&
+    status !== "awaiting-confirmation" &&
+    status !== "locked"
   ) {
-    throw new Error('Inspection response contains an unsupported status.')
+    throw new Error("Inspection response contains an unsupported status.");
   }
   if (
-    assetType !== 'scooter' &&
-    assetType !== 'bike' &&
-    assetType !== 'apartment' &&
-    assetType !== 'house'
+    assetType !== "scooter" &&
+    assetType !== "bike" &&
+    assetType !== "apartment" &&
+    assetType !== "house"
   ) {
-    throw new Error('Inspection response contains an unsupported asset type.')
+    throw new Error("Inspection response contains an unsupported asset type.");
   }
 
   const areas = Array.isArray(value.areas)
-    ? value.areas.filter((area): area is string => typeof area === 'string')
-    : []
+    ? value.areas.filter((area): area is string => typeof area === "string")
+    : [];
   const completedAreaIds = Array.isArray(value.completedAreaIds)
     ? value.completedAreaIds.filter(
-        (area): area is string => typeof area === 'string',
+        (area): area is string => typeof area === "string",
       )
-    : []
+    : [];
 
   return {
-    id: stringField(value.id ?? value.inspectionId, 'id'),
-    sessionCode: stringField(value.sessionCode, 'sessionCode'),
+    id: stringField(value.id ?? value.inspectionId, "id"),
+    sessionCode: stringField(value.sessionCode, "sessionCode"),
     assetType,
-    assetName: stringField(value.assetName, 'assetName'),
+    assetName: stringField(value.assetName, "assetName"),
     inspectionType,
     status,
-    ownerId: stringField(value.ownerId, 'ownerId'),
-    renterId: typeof value.renterId === 'string' ? value.renterId : undefined,
+    ownerId: stringField(value.ownerId, "ownerId"),
+    renterId: typeof value.renterId === "string" ? value.renterId : undefined,
     areas,
     completedAreaIds,
-    createdAt: stringField(value.createdAt, 'createdAt'),
-  }
+    createdAt: stringField(value.createdAt, "createdAt"),
+  };
 }
 
 export async function createInspection(
   input: CreateInspectionInput,
 ): Promise<Inspection> {
-  const assetName = input.assetName.trim()
-  if (!assetName) throw new Error('Asset name is required.')
+  const assetName = input.assetName.trim();
+  if (!assetName) throw new Error("Asset name is required.");
 
-  const response = await request<ApiInspection>('/inspections', {
-    method: 'POST',
+  const response = await request<ApiInspection>("/inspections", {
+    method: "POST",
     body: JSON.stringify({
       ...input,
       assetName,
       areas: INSPECTION_AREAS[input.assetType],
     }),
-  })
-  return inspectionFromApi(response)
+  });
+  return inspectionFromApi(response);
 }
 
 export async function getInspection(id: string): Promise<Inspection> {
   const response = await request<ApiInspection>(
     `/inspections/${encodeURIComponent(id)}`,
-  )
-  return inspectionFromApi(response)
+  );
+  return inspectionFromApi(response);
 }
 
-export async function listInspections(
-  _userId: string,
-): Promise<Inspection[]> {
-  const response = await request<ApiInspection[]>('/inspections')
-  return response.map(inspectionFromApi)
+export async function listInspections(_userId: string): Promise<Inspection[]> {
+  const response = await request<ApiInspection[]>("/inspections");
+  return response.map(inspectionFromApi);
 }
 
-export async function joinInspection(
-  sessionCode: string,
-): Promise<Inspection> {
-  const normalizedCode = sessionCode.trim().toUpperCase()
+export async function joinInspection(sessionCode: string): Promise<Inspection> {
+  const normalizedCode = sessionCode.trim().toUpperCase();
   if (!isValidDeployedSessionCode(normalizedCode)) {
-    throw new Error('Enter a valid 6-character inspection code.')
+    throw new Error("Enter a valid 6-character inspection code.");
   }
 
   // The deployed handler resolves the inspection by sessionCode and does not
@@ -156,11 +191,11 @@ export async function joinInspection(
   const response = await request<ApiInspection>(
     `/inspections/${encodeURIComponent(normalizedCode)}/join`,
     {
-      method: 'POST',
+      method: "POST",
       body: JSON.stringify({ sessionCode: normalizedCode }),
     },
-  )
-  return inspectionFromApi(response)
+  );
+  return inspectionFromApi(response);
 }
 
 export async function updateInspection(
@@ -168,6 +203,53 @@ export async function updateInspection(
   _updates: Partial<Inspection>,
 ): Promise<Inspection> {
   throw new Error(
-    'The deployed inspection API does not expose a general update operation.',
-  )
+    "The deployed inspection API does not expose a general update operation.",
+  );
+}
+
+export async function requestEvidenceUploadUrl(
+  inspectionId: string,
+  requestData: EvidenceUploadRequest,
+): Promise<EvidenceUploadResponse> {
+  const response = await request<{
+    evidenceId?: unknown;
+    uploadUrl?: unknown;
+    key?: unknown;
+  }>(`/inspections/${encodeURIComponent(inspectionId)}/evidence/upload-url`, {
+    method: "POST",
+    body: JSON.stringify(requestData),
+  });
+
+  if (typeof response.evidenceId !== "string" || !response.evidenceId) {
+    throw new Error("Evidence upload response is missing evidenceId.");
+  }
+
+  if (typeof response.uploadUrl !== "string" || !response.uploadUrl) {
+    throw new Error("Evidence upload response is missing uploadUrl.");
+  }
+
+  if (typeof response.key !== "string" || !response.key) {
+    throw new Error("Evidence upload response is missing key.");
+  }
+
+  return {
+    evidenceId: response.evidenceId,
+    uploadUrl: response.uploadUrl,
+    key: response.key,
+  };
+}
+
+export async function saveEvidence(
+  inspectionId: string,
+  requestData: SaveEvidenceRequest,
+): Promise<EvidenceMetadata> {
+  const response = await request<EvidenceMetadata>(
+    `/inspections/${encodeURIComponent(inspectionId)}/evidence`,
+    {
+      method: "POST",
+      body: JSON.stringify(requestData),
+    },
+  );
+
+  return response;
 }
