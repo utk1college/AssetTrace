@@ -10,6 +10,7 @@ import type {
   EvidenceUploadResponse,
   Comparison,
   EvidencePhase,
+  CapturePoint,
   Inspection,
   SaveEvidenceRequest,
 } from "../inspectionService";
@@ -92,6 +93,17 @@ function writeComparisons(comparisons: Comparison[]): void {
   localStorage.setItem(COMPARISON_STORAGE_KEY, JSON.stringify(comparisons));
 }
 
+function normalizeStoredInspection(inspection: Inspection): Inspection {
+  if (inspection.capturePoints?.length) return inspection;
+  return {
+    ...inspection,
+    capturePoints: inspection.areas.map((title, order) => ({
+      id: title,
+      title,
+      order,
+    })),
+  };
+}
 function createId(): string {
   if (typeof crypto !== "undefined" && "randomUUID" in crypto) {
     return crypto.randomUUID();
@@ -127,7 +139,9 @@ export async function createInspection(
     throw new Error("Asset name is required.");
   }
 
-  const areas = [...INSPECTION_AREAS[input.assetType]];
+  const defaultAreas = [...INSPECTION_AREAS[input.assetType]];
+  const capturePoints = normalizeCapturePoints(input.capturePoints, defaultAreas);
+  const areas = capturePoints.map((point) => point.id);
   const inspections = readInspections();
 
   const inspection: Inspection = {
@@ -139,6 +153,7 @@ export async function createInspection(
     status: "in-progress",
     ownerId: MOCK_OWNER_ID,
     areas,
+    capturePoints,
     completedAreaIds: [],
     createdAt: new Date().toISOString(),
     acknowledgements: {},
@@ -153,16 +168,21 @@ export async function createInspection(
   return inspection;
 }
 
+function normalizeCapturePoints(points: CapturePoint[] | undefined, areas: string[]): CapturePoint[] {
+  const source = points?.length ? points : areas.map((title, order) => ({ id: `area-${order + 1}`, title, order }));
+  return source.map((point, order) => ({
+    id: point.id || `capture-${order + 1}`,
+    title: point.title.trim(),
+    order,
+  })).filter((point) => point.title);
+}
+
 export async function getInspection(id: string): Promise<Inspection> {
   await delay();
 
   const inspection = readInspections().find((candidate) => candidate.id === id);
-
-  if (!inspection) {
-    throw new Error("Inspection not found.");
-  }
-
-  return inspection;
+  if (!inspection) throw new Error("Inspection not found.");
+  return normalizeStoredInspection(inspection);
 }
 
 export async function listInspections(userId: string): Promise<Inspection[]> {
@@ -171,7 +191,7 @@ export async function listInspections(userId: string): Promise<Inspection[]> {
   return readInspections().filter(
     (inspection) =>
       inspection.ownerId === userId || inspection.renterId === userId,
-  );
+  ).map(normalizeStoredInspection);
 }
 
 export async function joinInspection(sessionCode: string): Promise<Inspection> {
@@ -455,6 +475,7 @@ export async function compareInspection(
   const returnAreas = new Set(returnEvidence.map((item) => item.areaId));
   const changes = baselineEvidence.map((item) => ({
     areaId: item.areaId,
+    capturePointTitle: item.capturePointTitle,
     category: "Condition",
     status: returnAreas.has(item.areaId) ? ("No visible change" as const) : ("Uncertain" as const),
     confidence: returnAreas.has(item.areaId) ? 0.5 : 0.2,

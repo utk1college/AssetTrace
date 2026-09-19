@@ -1,5 +1,5 @@
 ﻿import { useState } from 'react'
-import { ArrowRight, Bike, Building2, Check, Copy, House } from 'lucide-react'
+import { ArrowRight, Bike, Building2, Check, Copy, House, Plus, Trash2 } from 'lucide-react'
 import { QRCodeSVG } from 'qrcode.react'
 import { useNavigate } from 'react-router-dom'
 
@@ -8,7 +8,9 @@ import { useInspectionStore } from '@/store/inspectionStore'
 import type {
   AssetType,
   InspectionType,
+  CapturePoint,
 } from '@/services/inspectionService'
+import { INSPECTION_AREAS } from '@/config/constants'
 
 const ASSET_OPTIONS: {
   value: AssetType
@@ -51,6 +53,9 @@ export default function CreateInspectionPage() {
   const [assetName, setAssetName] = useState('')
   const [inspectionType, setInspectionType] =
     useState<InspectionType>('move-in')
+  const [capturePointTitles, setCapturePointTitles] = useState<string[]>(
+    INSPECTION_AREAS.scooter.map((title) => title.replace(/-/g, ' ')),
+  )
   const [createdInspection, setCreatedInspection] = useState<Awaited<
     ReturnType<typeof createInspection>
   > | null>(null)
@@ -63,11 +68,19 @@ export default function CreateInspectionPage() {
       return
     }
 
+    const titles = capturePointTitles.map((title) => title.trim()).filter(Boolean)
+    if (!titles.length) return
+
     try {
       const inspection = await createInspection({
         assetType,
         assetName,
         inspectionType,
+        capturePoints: titles.map((title, order): CapturePoint => ({
+          id: `capture-${crypto.randomUUID()}`,
+          title,
+          order,
+        })),
       })
 
       setCreatedInspection(inspection)
@@ -214,7 +227,10 @@ export default function CreateInspectionPage() {
                   <button
                     key={option.value}
                     type="button"
-                    onClick={() => setAssetType(option.value)}
+                    onClick={() => {
+                      setAssetType(option.value)
+                      setCapturePointTitles(INSPECTION_AREAS[option.value].map((title) => title.replace(/-/g, ' ')))
+                    }}
                     aria-pressed={selected}
                     className={[
                       'min-h-20 rounded-xl border p-4 text-left transition-colors',
@@ -235,6 +251,28 @@ export default function CreateInspectionPage() {
                   </button>
                 )
               })}
+            </div>
+          </section>
+
+          <section>
+            <div className="mb-3 flex items-center justify-between gap-3">
+              <div>
+                <h2 className="section-label">PHOTO TITLES</h2>
+                <p className="text-small mt-1">These titles become the renter's required return photos.</p>
+              </div>
+              <button type="button" className="min-h-12 rounded-lg border border-[var(--border)] px-3 text-small" onClick={() => setCapturePointTitles((current) => [...current, ''])}>
+                <Plus className="mr-1 inline h-4 w-4" aria-hidden="true" />Add
+              </button>
+            </div>
+            <div className="space-y-3">
+              {capturePointTitles.map((title, index) => (
+                <div className="flex items-center gap-2" key={`capture-point-${index}`}>
+                  <input value={title} onChange={(event) => setCapturePointTitles((current) => current.map((item, itemIndex) => itemIndex === index ? event.target.value : item))} aria-label={`Photo title ${index + 1}`} className="min-h-12 min-w-0 flex-1 rounded-lg border border-[var(--border)] bg-white px-4 text-[15px]" />
+                  <button type="button" aria-label={`Remove photo title ${index + 1}`} className="min-h-12 min-w-12 rounded-lg border border-[var(--border)]" onClick={() => setCapturePointTitles((current) => current.filter((_, itemIndex) => itemIndex !== index))} disabled={capturePointTitles.length === 1}>
+                    <Trash2 className="mx-auto h-4 w-4" aria-hidden="true" />
+                  </button>
+                </div>
+              ))}
             </div>
           </section>
 

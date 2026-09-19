@@ -190,7 +190,7 @@ function InspectionCard({
 }) {
   const Icon = ASSET_ICONS[inspection.assetType]
 
-  const totalAreas = inspection.areas.length
+  const totalAreas = inspection.capturePoints.length || inspection.areas.length
   const completedAreas = inspection.completedAreaIds.length
 
   const percent =

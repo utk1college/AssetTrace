@@ -28,6 +28,7 @@ interface ApiInspection {
   renterId?: unknown;
   areas?: unknown;
   completedAreaIds?: unknown;
+  capturePoints?: unknown;
   createdAt?: unknown;
   acknowledgements?: unknown
   lockedAt?: unknown
@@ -139,6 +140,9 @@ function inspectionFromApi(value: ApiInspection): Inspection {
         (area): area is string => typeof area === "string",
       )
     : [];
+  const capturePoints = Array.isArray(value.capturePoints)
+    ? value.capturePoints.filter((point): point is { id: string; title: string; order: number } => Boolean(point) && typeof point === "object" && typeof (point as { id?: unknown }).id === "string" && typeof (point as { title?: unknown }).title === "string").map((point, index) => ({ id: point.id, title: point.title, order: typeof point.order === "number" ? point.order : index }))
+    : areas.map((area, index) => ({ id: area, title: area, order: index }));
   const acknowledgements =
   value.acknowledgements && typeof value.acknowledgements === "object"
       ? Object.fromEntries(
@@ -159,6 +163,7 @@ function inspectionFromApi(value: ApiInspection): Inspection {
     ownerId: stringField(value.ownerId, "ownerId"),
     renterId: typeof value.renterId === "string" ? value.renterId : undefined,
     areas,
+    capturePoints,
     completedAreaIds,
     createdAt: stringField(value.createdAt, "createdAt"),
     acknowledgements,
@@ -193,6 +198,7 @@ function comparisonFromApi(value: unknown): Comparison {
     }
     return {
       areaId: candidate.areaId,
+      capturePointTitle: typeof candidate.capturePointTitle === "string" ? candidate.capturePointTitle : undefined,
       category: candidate.category,
       status,
       confidence: candidate.confidence,
@@ -221,6 +227,7 @@ export async function createInspection(
       ...input,
       assetName,
       areas: INSPECTION_AREAS[input.assetType],
+      capturePoints: input.capturePoints,
     }),
   });
   return inspectionFromApi(response);

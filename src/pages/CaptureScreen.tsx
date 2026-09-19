@@ -1,7 +1,7 @@
 ﻿import { useEffect, useState } from "react";
 import { useLocation, useNavigate, useParams } from "react-router-dom";
 import CameraCapture from "@/components/capture/CameraCapture";
-import inspectionService from "@/services/inspectionService";
+import inspectionService, { type CapturePoint } from "@/services/inspectionService";
 import { getCurrentLocation, sha256Blob } from "@/utils/captureEvidence";
 
 import { getCaptureTelemetry } from "@/utils/captureTelemetry";
@@ -13,7 +13,7 @@ export default function CaptureScreen() {
   const navigate = useNavigate();
   const user = useAuthStore((state) => state.user);
   const phase = location.pathname.includes("/return") ? "return" : "baseline";
-  const [areas, setAreas] = useState<string[]>([]);
+  const [capturePoints, setCapturePoints] = useState<CapturePoint[]>([]);
   const [currentAreaIndex, setCurrentAreaIndex] = useState(0);
   const [error, setError] = useState<string | null>(null);
   const [isSaving, setIsSaving] = useState(false);
@@ -53,7 +53,9 @@ export default function CaptureScreen() {
             return;
           }
 
-          setAreas(inspection.areas);
+          setCapturePoints(inspection.capturePoints.length
+            ? [...inspection.capturePoints].sort((left, right) => left.order - right.order)
+            : inspection.areas.map((title, order) => ({ id: `area-${order + 1}`, title, order })));
         })
         .catch(() => {
           setError("Unable to load the inspection. Please try again.");
@@ -66,9 +68,10 @@ export default function CaptureScreen() {
   }, [id, phase, user?.id]);
 
   async function saveEvidence(file: Blob) {
-    const areaId = areas[currentAreaIndex];
+    const capturePoint = capturePoints[currentAreaIndex];
+    const areaId = capturePoint?.id;
 
-    if (!id || !areaId) {
+    if (!id || !capturePoint) {
       setError("Unable to save this evidence. Please try again.");
       return;
     }
@@ -89,6 +92,7 @@ export default function CaptureScreen() {
 
       const upload = await inspectionService.requestEvidenceUploadUrl(id, {
         areaId,
+        capturePointId: capturePoint.id,
         contentType: file.type,
         phase,
       });
@@ -98,6 +102,8 @@ export default function CaptureScreen() {
       await inspectionService.saveEvidence(id, {
         evidenceId: upload.evidenceId,
         areaId,
+        capturePointId: capturePoint.id,
+        capturePointTitle: capturePoint.title,
         phase,
         key: upload.key,
         sha256,
@@ -109,7 +115,7 @@ export default function CaptureScreen() {
       setIsSaved(true);
       setPendingFile(null);
 
-      if (currentAreaIndex < areas.length - 1) {
+      if (currentAreaIndex < capturePoints.length - 1) {
         setCurrentAreaIndex((index) => index + 1);
         setIsSaved(false);
       } else {
@@ -149,7 +155,7 @@ export default function CaptureScreen() {
     );
   }
 
-  if (!areas.length) {
+  if (!capturePoints.length) {
     return (
       <main className="container py-6">
         <p className="text-sm text-[var(--text-secondary)]">
@@ -163,11 +169,11 @@ export default function CaptureScreen() {
     <main className="container py-6">
       <div className="mb-4">
         <p className="text-sm text-[var(--text-secondary)]">
-          Area {currentAreaIndex + 1} of {areas.length}
+          Photo {currentAreaIndex + 1} of {capturePoints.length}
         </p>
 
         <h1 className="mt-1 text-xl font-semibold text-[var(--text)]">
-          {areas[currentAreaIndex]}
+          {capturePoints[currentAreaIndex].title}
         </h1>
 
         <p className="mt-1 text-sm text-[var(--text-secondary)]">

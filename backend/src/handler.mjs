@@ -61,7 +61,12 @@ function requireFields(value, fields) {
 
 function inspectionItem(input, userId) {
   const id = randomUUID()
-  return { inspectionId: id, sk: `META#${id}`, entity: 'inspection', id, sessionCode: input.sessionCode ?? generateSessionCode(), assetType: input.assetType, assetName: input.assetName, inspectionType: input.inspectionType, status: 'in-progress', ownerId: userId, areas: input.areas ?? [], completedAreaIds: [], createdAt: new Date().toISOString(), updatedAt: new Date().toISOString() }
+  const areas = Array.isArray(input.areas) ? input.areas : []
+  const capturePoints = Array.isArray(input.capturePoints) && input.capturePoints.length
+    ? input.capturePoints.map((point, order) => ({ id: point.id || randomUUID(), title: String(point.title ?? '').trim(), order })).filter((point) => point.title)
+    : areas.map((title, order) => ({ id: `area-${order + 1}`, title, order }))
+  if (!capturePoints.length) throw Object.assign(new Error('At least one photo title is required'), { statusCode: 400, code: 'INVALID_CAPTURE_POINTS' })
+  return { inspectionId: id, sk: `META#${id}`, entity: 'inspection', id, sessionCode: input.sessionCode ?? generateSessionCode(), assetType: input.assetType, assetName: input.assetName, inspectionType: input.inspectionType, status: 'in-progress', ownerId: userId, areas: capturePoints.map((point) => point.id), capturePoints, completedAreaIds: [], createdAt: new Date().toISOString(), updatedAt: new Date().toISOString() }
 }
 
 async function createInspection(event) {
@@ -69,6 +74,12 @@ async function createInspection(event) {
   const item = inspectionItem(input, userId)
   await dynamodb.send(new PutItemCommand({ TableName: config.inspectionsTable, Item: marshall(item, { removeUndefinedValues: true }) }))
   return ok(item, 201)
+}
+
+function capturePointsFor(item) {
+  return Array.isArray(item.capturePoints) && item.capturePoints.length
+    ? item.capturePoints
+    : (item.areas ?? []).map((title, order) => ({ id: title, title, order }))
 }
 
 async function getInspection(id) {
@@ -128,6 +139,8 @@ async function uploadUrl(event) {
   if (phase === 'return' && userId !== item.renterId) return fail(403, 'RENTER_ONLY', 'Only the renter can upload return evidence')
   if (!allowedEvidencePhases.has(phase)) return fail(400, 'INVALID_PHASE', 'Evidence phase must be baseline or return')
   if (phase === 'return' && item.status !== 'locked') return fail(409, 'BASELINE_REQUIRED', 'The baseline must be locked before return evidence can be uploaded')
+  const capturePoint = capturePointsFor(item).find((point) => point.id === (input.capturePointId ?? input.areaId))
+  if (!capturePoint) return fail(400, 'INVALID_CAPTURE_POINT', 'The photo title is not part of this inspection')
   if (item.status === 'locked' && phase === 'baseline') return fail(409, 'INSPECTION_LOCKED', 'Baseline evidence cannot be changed after locking')
   if (!allowedImageTypes.has(input.contentType)) return fail(400, 'INVALID_CONTENT_TYPE', 'Evidence must be a JPEG, PNG, GIF, or WebP image')
   const evidenceId = randomUUID(); const key = `inspections/${id}/${evidenceId}`
@@ -145,13 +158,15 @@ async function saveEvidence(event) {
   if (phase === 'return' && userId !== item.renterId) return fail(403, 'RENTER_ONLY', 'Only the renter can save return evidence')
   if (!allowedEvidencePhases.has(phase)) return fail(400, 'INVALID_PHASE', 'Evidence phase must be baseline or return')
   if (phase === 'return' && item.status !== 'locked') return fail(409, 'BASELINE_REQUIRED', 'The baseline must be locked before return evidence can be saved')
+  const capturePoint = capturePointsFor(item).find((point) => point.id === (input.capturePointId ?? input.areaId))
+  if (!capturePoint) return fail(400, 'INVALID_CAPTURE_POINT', 'The photo title is not part of this inspection')
   if (item.status === 'locked' && phase === 'baseline') return fail(409, 'INSPECTION_LOCKED', 'Baseline evidence cannot be changed after locking')
   const expectedPrefix = `inspections/${id}/`
   if (typeof input.key !== 'string' || !input.key.startsWith(expectedPrefix)) return fail(400, 'INVALID_EVIDENCE_KEY', 'Evidence key does not belong to this inspection')
   const uploaded = await s3.send(new HeadObjectCommand({ Bucket: config.bucket, Key: input.key }))
   const contentType = uploaded.ContentType?.split(';')[0]?.toLowerCase()
   if (!allowedImageTypes.has(contentType)) return fail(400, 'INVALID_CONTENT_TYPE', 'Evidence must be a JPEG, PNG, GIF, or WebP image')
-  const evidence = { inspectionId: id, evidenceId: input.evidenceId, entity: 'evidence', ...input, phase, contentType, sizeBytes: uploaded.ContentLength, capturedBy: userIdOf(event), createdAt: new Date().toISOString() }
+  const evidence = { inspectionId: id, evidenceId: input.evidenceId, entity: 'evidence', ...input, areaId: capturePoint.id, capturePointId: capturePoint.id, capturePointTitle: capturePoint.title, phase, contentType, sizeBytes: uploaded.ContentLength, capturedBy: userIdOf(event), createdAt: new Date().toISOString() }
   await dynamodb.send(new PutItemCommand({ TableName: config.evidenceTable, Item: marshall(evidence, { removeUndefinedValues: true }), ConditionExpression: 'attribute_not_exists(inspectionId) AND attribute_not_exists(evidenceId)' }))
   if (phase === 'baseline' && !item.completedAreaIds?.includes(input.areaId)) {
     await dynamodb.send(new UpdateItemCommand({ TableName: config.inspectionsTable, Key: marshall({ inspectionId: id, sk: item.sk }), UpdateExpression: 'SET completedAreaIds = list_append(if_not_exists(completedAreaIds, :empty), :area), updatedAt = :updatedAt', ExpressionAttributeValues: marshall({ ':empty': [], ':area': [input.areaId], ':updatedAt': new Date().toISOString() }) }))
@@ -202,7 +217,7 @@ async function imageContent(id, evidence, label) {
   const bytes = await object.Body.transformToByteArray()
   if (bytes.byteLength > maxImageBytes) throw Object.assign(new Error(`Image ${label} is larger than Bedrock's 25 MB limit`), { statusCode: 413, code: 'IMAGE_TOO_LARGE' })
   return [
-    { text: `${label} — area: ${evidence.areaId}` },
+    { text: `${label} — capture point: ${evidence.capturePointTitle ?? evidence.areaId} — ID: ${evidence.capturePointId ?? evidence.areaId}` },
     { image: { format, source: { bytes } } },
   ]
 }
@@ -218,7 +233,7 @@ function parseComparison(text) {
     if (!change || typeof change.areaId !== 'string' || typeof change.category !== 'string' || !validStatuses.has(change.status) || typeof change.explanation !== 'string' || typeof change.confidence !== 'number' || change.confidence < 0 || change.confidence > 1) {
       throw new Error('Model returned an invalid change item')
     }
-    return { areaId: change.areaId, category: change.category, status: change.status, confidence: change.confidence, explanation: change.explanation }
+    return { areaId: change.areaId, capturePointTitle: typeof change.capturePointTitle === 'string' ? change.capturePointTitle : undefined, category: change.category, status: change.status, confidence: change.confidence, explanation: change.explanation }
   })
   return parsed
 }
@@ -228,7 +243,7 @@ async function compare(event) {
   if (userIdOf(event) !== item.ownerId) return fail(403, 'OWNER_ONLY', 'Only the owner can run the comparison')
   if (item.status !== 'locked') return fail(409, 'BASELINE_NOT_LOCKED', 'The baseline must be locked before comparison')
   const input = bodyOf(event); validateComparisonInput(input)
-  const content = [{ text: 'You are comparing rental inspection photographs. Inspect the actual images, match baseline and return images by area, and report only visible changes. Return ONLY valid JSON, with no Markdown or extra text, in this exact shape: {"changes":[{"areaId":"string","category":"string","status":"Existing|New|Uncertain|No visible change","confidence":0.0,"explanation":"string"}]}. Confidence must be between 0 and 1. Do not claim legal validity. If an area cannot be confidently compared, use Uncertain.' }]
+  const content = [{ text: 'You are comparing rental inspection photographs. Match baseline and return images by capture-point title and ID, report only visible changes, and return ONLY valid JSON with no Markdown in this shape: {"changes":[{"areaId":"string","capturePointTitle":"string","category":"string","status":"Existing|New|Uncertain|No visible change","confidence":0.0,"explanation":"string"}]}. Confidence must be between 0 and 1. Do not claim legal validity. If an image cannot be confidently compared, use Uncertain.' }]
   for (const evidence of input.baselineEvidence) content.push(...await imageContent(id, evidence, 'BASELINE'))
   for (const evidence of input.returnEvidence) content.push(...await imageContent(id, evidence, 'RETURN'))
   const response = await bedrock.send(new ConverseCommand({ modelId: config.modelId, messages: [{ role: 'user', content }], inferenceConfig: { maxTokens: 1200, temperature: 0 } }))

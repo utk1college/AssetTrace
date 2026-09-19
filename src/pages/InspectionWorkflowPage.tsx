@@ -101,7 +101,10 @@ export default function InspectionWorkflowPage() {
   const Icon = ASSET_ICONS[inspection.assetType]
 
   const completedAreas = inspection.completedAreaIds.length
-  const totalAreas = inspection.areas.length
+  const capturePoints = inspection.capturePoints.length
+    ? [...inspection.capturePoints].sort((left, right) => left.order - right.order)
+    : inspection.areas.map((title, order) => ({ id: title, title, order }))
+  const totalAreas = capturePoints.length
 
   const nextAction = getNextAction(inspection, user?.id)
 
@@ -176,8 +179,10 @@ export default function InspectionWorkflowPage() {
               </div>
             ) : (
               <Checklist
-                areas={inspection.areas}
-                completedAreaIds={inspection.completedAreaIds}
+                areas={capturePoints.map((point) => point.title)}
+                completedAreaIds={capturePoints
+                  .filter((point) => inspection.completedAreaIds.includes(point.id))
+                  .map((point) => point.title)}
               />
             )}
           </section>

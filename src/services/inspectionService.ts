@@ -16,6 +16,7 @@ export type EvidencePhase = "baseline" | "return";
 
 export interface EvidenceUploadRequest {
   areaId: string;
+  capturePointId?: string;
   contentType: string;
   phase?: EvidencePhase;
 }
@@ -29,6 +30,8 @@ export interface EvidenceUploadResponse {
 export interface SaveEvidenceRequest {
   evidenceId: string;
   areaId: string;
+  capturePointId?: string;
+  capturePointTitle?: string;
   phase: EvidencePhase;
   key: string;
   sha256: string;
@@ -45,6 +48,8 @@ export interface EvidenceMetadata {
   evidenceId: string;
   inspectionId: string;
   areaId: string;
+  capturePointId?: string;
+  capturePointTitle?: string;
   phase: EvidencePhase;
   key: string;
   sha256: string;
@@ -66,6 +71,7 @@ export type ComparisonStatus =
 
 export interface ComparisonChange {
   areaId: string;
+  capturePointTitle?: string;
   category: string;
   status: ComparisonStatus;
   confidence: number;
@@ -90,16 +96,23 @@ export interface Inspection {
   ownerId: string;
   renterId?: string;
   areas: string[];
+  capturePoints: CapturePoint[];
   completedAreaIds: string[];
   createdAt: string;
   acknowledgements?: Record<string, string>
   lockedAt?: string
 }
 
+export interface CapturePoint {
+  id: string;
+  title: string;
+  order: number;
+}
+
 export type CreateInspectionInput = Pick<
   Inspection,
   "assetType" | "assetName" | "inspectionType"
->;
+> & { capturePoints?: CapturePoint[] };
 
 const useMock = import.meta.env.VITE_USE_MOCK !== "false";
 
