@@ -8,7 +8,7 @@ AssetTrace creates a shared, evidence-led condition record when a rental asset c
 
 1. Read [DESIGN.md](DESIGN.md) before changing UI. It is the single visual and interaction source of truth.
 2. Read [TEAM_PLAN.md](TEAM_PLAN.md) for ownership, branch rules, API contracts, and handover criteria.
-3. Develop in mock mode unless the team lead explicitly says that the real API is deployed and gives you its URL.
+3. Use mock mode for isolated UI work. Real mode is available for the deployed integration described in `Utkrisht.md` and `TEAM_PLAN.md`.
 
 ## Run locally
 
@@ -60,9 +60,9 @@ The project has two intended service modes, selected by `VITE_USE_MOCK`.
 | Mode | `VITE_USE_MOCK` | When to use it | AWS calls |
 |---|---:|---|---|
 | Mock | `true` | Default for all feature work and UI testing | None |
-| Real | `false` | Only after the API Gateway URL and backend contract are supplied | Cognito, API Gateway, and presigned S3 upload URLs |
+| Real | `false` | Authenticated browser integration with the deployed API | Cognito, API Gateway, and presigned S3 upload URLs |
 
-Do not switch to real mode merely because Cognito, DynamoDB, or S3 exists. Real mode requires deployed Lambda/API endpoints, S3 CORS, and a tested browser integration.
+Real mode requires the deployed API URL and a confirmed browser session. The checked-in `.env.example` contains the non-secret deployed endpoint; `.env.local` remains local-only.
 
 `.env.example` contains the shared non-secret identifiers. Never commit credentials, local access keys, or a populated `.env.local`.
 
@@ -138,8 +138,15 @@ Follow `DESIGN.md` exactly. The experience is mobile-first, calm, evidence-first
 - Build loading, empty, error, and permission-denied states for asynchronous screens.
 - Preserve existing pages and components outside your assigned scope.
 
-## Current project status — September 18, 2026
+## Current project status — September 19, 2026
 
-The frontend shell, routes, shared UI components, redesigned mobile dashboard, and a local backend scaffold/API contract in `Utkrisht.md` are present. The production frontend build/lint pass. The project is ready for the three feature owners to implement and test their assigned flows in **mock mode**.
+The real backend is deployed in `us-east-1`. Cognito registration, email confirmation, login, protected API access, inspection create/join, acknowledgement, baseline lock, S3 presigned uploads, and evidence metadata persistence are available through the deployed API. The frontend is connected in real mode with:
 
-AWS in `us-east-1` has been verified: the Cognito user pool and app client, three DynamoDB tables, S3 evidence bucket, IAM developer group, and three teammate IAM users exist. No Lambda functions, API Gateway APIs, or S3 CORS configuration exist yet. Consequently, there is **no real API to integrate with** and `VITE_USE_MOCK=false` is not usable yet. The team lead must verify the remaining table schemas, deploy the backend, configure CORS, and publish the API URL before the real-mode integration phase.
+```text
+VITE_USE_MOCK=false
+VITE_API_ENDPOINT=https://5v3g0fkokj.execute-api.us-east-1.amazonaws.com/prod
+```
+
+Completed frontend foundations include real/mock authentication adapters, session restoration, create/join inspection adapters, compatible six-character session-code handling, and a real-mode environment template. See `Utkrisht.md` for deployed API details and `TEAM_PLAN.md` for the active feature assignments.
+
+The next product phase is the remaining README flow: guided evidence capture, review and joint acknowledgement, return evidence, controlled Bedrock comparison verification, comparison retrieval, and condition reports. The backend comparison endpoint exists but must not be described as verified until a real baseline/return comparison succeeds and the result is persisted and retrieved.

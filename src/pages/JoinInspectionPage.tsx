@@ -4,7 +4,10 @@ import { useNavigate } from 'react-router-dom'
 
 import PrimaryButton from '@/components/ui/PrimaryButton'
 import { useInspectionStore } from '@/store/inspectionStore'
-import { isValidSessionCode } from '@/utils/sessionCode'
+import {
+  isValidDeployedSessionCode,
+  isValidSessionCode,
+} from '@/utils/sessionCode'
 import type { Inspection } from '@/services/inspectionService'
 
 const ASSET_ICONS: Record<Inspection['assetType'], typeof Bike> = {
@@ -28,10 +31,15 @@ export default function JoinInspectionPage() {
   const [joinedInspection, setJoinedInspection] =
     useState<Inspection | null>(null)
 
+  const isRealMode = import.meta.env.VITE_USE_MOCK === 'false'
+  const isCurrentModeSessionCode = isRealMode
+    ? isValidDeployedSessionCode
+    : isValidSessionCode
+
   const normalizedCode = sessionCode.trim().toUpperCase()
 
   const hasInput = normalizedCode.length > 0
-  const hasInvalidFormat = hasInput && !isValidSessionCode(normalizedCode)
+  const hasInvalidFormat = hasInput && !isCurrentModeSessionCode(normalizedCode)
 
   const handleCodeChange = (
     event: React.ChangeEvent<HTMLInputElement>,
@@ -53,7 +61,7 @@ export default function JoinInspectionPage() {
   ) => {
     event.preventDefault()
 
-    if (!isValidSessionCode(normalizedCode)) {
+    if (!isCurrentModeSessionCode(normalizedCode)) {
       return
     }
 
@@ -96,7 +104,9 @@ export default function JoinInspectionPage() {
                     <span>
                       {joinedInspection.inspectionType === 'move-in'
                         ? 'Move-in'
-                        : 'Move-out'}
+                        : joinedInspection.inspectionType === 'move-out'
+                          ? 'Move-out'
+                          : 'Handover'}
                     </span>
                   </p>
                 </div>
@@ -208,7 +218,7 @@ export default function JoinInspectionPage() {
             type="submit"
             disabled={
               isLoading ||
-              !isValidSessionCode(normalizedCode)
+              !isCurrentModeSessionCode(normalizedCode)
             }
           >
             {isLoading ? 'Joining inspection...' : 'Join inspection'}

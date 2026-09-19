@@ -1,37 +1,83 @@
-# AssetTrace team handover
+# AssetTrace implementation plan
 
-**Updated:** September 18, 2026  
-**Default mode for every feature owner:** Mock mode (`VITE_USE_MOCK=true`)
+**Updated:** September 19, 2026
+**UI authority:** [DESIGN.md](DESIGN.md) is the single source of truth for every product interface.
+**Current integration mode:** Real mode is available at the deployed API; mock mode remains useful for isolated UI work.
 
-This document assigns work without blocking on the backend. Read [README.md](README.md) first for setup and verified project status, then [DESIGN.md](DESIGN.md) before changing UI.
+Read [README.md](README.md) first for the product flow and environment setup, then read `DESIGN.md` before changing any page or component.
+
+## Current baseline — complete
+
+The following foundation work is complete and is no longer active feature work:
+
+- Cognito registration, email confirmation, login, sign-out, protected routes, and real-session restoration.
+- Real and mock authentication adapters selected by `VITE_USE_MOCK`.
+- Inspection create, get, list, join, session-code, and local mock support.
+- Deployed API Gateway/Lambda, Cognito JWT authorizer, DynamoDB tables, S3 presigned-upload route, acknowledgement, baseline lock, and Bedrock comparison route.
+- Browser integration for real-mode authentication and inspection creation/joining.
+- Session-code compatibility for both legacy hexadecimal codes and new unambiguous codes.
+
+The known verified deployment is:
+
+```text
+VITE_USE_MOCK=false
+VITE_API_ENDPOINT=https://5v3g0fkokj.execute-api.us-east-1.amazonaws.com/prod
+```
+
+The remaining product work follows the README flow:
+
+```text
+Capture → Verify → Acknowledge → Lock → Return → Compare → Report
+```
 
 ## Working agreement
 
-- Work only on your assigned branch and feature area. Do not rewrite another owner’s screen or shared design tokens without agreement.
-- Keep `VITE_USE_MOCK=true` until the team lead announces that the API is deployed, shares the base URL and contract, and asks for real-mode testing.
-- Match the service interfaces below in mock and real adapters. Pages and stores import only the selected facade, never a concrete adapter directly.
-- Use localStorage only inside mock adapters. Mock calls should resolve asynchronously (roughly 300ms) so loading/error handling is actually exercised.
-- UI must follow `DESIGN.md`: Lucide icons, semantic status states, mobile-first layout, 48px touch targets, and no emoji/gradients/AI marketing.
-- Test at 375px and 390px, run `npm run build` and `npm run lint`, then open a PR. Add only your handover note (`A.md`, `S.md`, or `Sh.md`) at the repository root.
-- Do not turn on real mode, provision resources, or add billable AWS calls without explicit approval from Utku.
+- Work only in the assigned branch and scope. Coordinate before changing a shared type, routing, service facade, shared component, or design token.
+- Preserve both modes. Mock adapters may use `localStorage`; real adapters must use the deployed API and must never embed AWS credentials.
+- Pages and stores import only facades, never a concrete mock or real adapter directly.
+- Use the real API only for scoped integration checks. Do not create, deploy, or modify AWS resources without Utkrisht’s explicit approval. Do not invoke Bedrock outside the agreed comparison test.
+- `DESIGN.md` wins over existing UI if they conflict. Use Lucide icons, sentence case, mobile-first composition, 48px targets, semantic status text, and loading/empty/recoverable-error states.
+- Test at 375px and 390px. Run `npm run build` and `npm run lint` (or the project-local equivalents if the npm launcher is unavailable) before handoff.
+- Do not commit `.env.local`, AWS credentials, tokens, screenshots containing user data, or generated SAM build output.
 
-## Branches and ownership
+## AI-agent context protocol
 
-| Owner | Branch | Scope | Starts now? |
-|---|---|---|---|
-| Saahya | `feat/auth-service` | Authentication service, store, login, registration, route guard | Yes, mock mode |
-| Abdul | `feat/inspection-service` | Inspection service, store, create/join workflow, session codes | Yes, mock mode |
-| Shreyash | `feat/camera-capture` | Camera, GPS, telemetry, hashing, capture UI | Yes, mock mode and physical-device testing |
-| Utkrisht | `infra/*` | Lambda/API Gateway, API contracts, S3 CORS, IAM, Bedrock, integration | Backend phase |
+Every teammate should give their AI agent this context before starting work:
 
-## Shared data contracts
+1. Read `README.md`, `DESIGN.md`, this plan, and the owner’s prior handover note.
+2. Inspect `git status` first; preserve unrelated changes and never reset, restore, or rewrite another owner’s work.
+3. Stay inside the assigned files and named API contract. Ask before widening scope.
+4. Use `apply_patch` for source edits. Do not silently change environment configuration, credentials, CloudFormation, Cognito, or S3 settings.
+5. For UI work, treat `DESIGN.md` as authoritative. Do not add emojis, gradients, dashboards, fake data, raw hashes, or unsupported authenticity/legal claims.
+6. For async work, include loading, empty, permission-denied, validation, and recovery states. Preserve an unsaved capture locally if upload fails.
+7. Validate with the prescribed checks, record exact manual test steps, and add a concise handover note containing completed work, files changed, API assumptions, and remaining blockers.
 
-Keep these client contracts stable. The team lead will publish the final HTTP request/response schema before the real-mode phase.
+## Next feature set and ownership
+
+| Owner | Branch | Active scope | Dependencies | Definition of done |
+|---|---|---|---|---|
+| Abdul | `feat/inspection-workflow` | Replace static dashboard data with the inspection facade; implement inspection workflow/detail and checklist progress using create/get/list results. | Existing auth and inspection services. | Owner sees live inspections, states are handled, and a created or joined inspection opens a usable workflow screen. |
+| Saahya | `feat/verification-lock` | Build the review, joint acknowledgement, and baseline-lock flow using authenticated inspection state. Add a small facade/store boundary for acknowledge/lock if needed. | Utkrisht confirms response shapes for acknowledge/lock; Abdul exposes the workflow hand-off. | Both roles see review state, acknowledgement is explicit, lock is disabled until both acknowledge, and locked state is clear. |
+| Shreyash | `feat/camera-evidence` | Complete camera-first guided capture, geolocation/telemetry, SHA-256, capture readiness, and resilient baseline/return evidence upload flow. | Utkrisht’s evidence endpoint contract; physical-device testing. | Live camera only, no gallery fallback, device permission/error states, direct presigned upload, metadata save, and documented mobile test results. |
+| Utkrisht | `infra/next-phase` | Publish and implement the remaining read contracts: inspection evidence listing, comparison retrieval/report data, and any response fields required by the three frontend flows. Verify return evidence save and one controlled Bedrock comparison run. | Coordinate request/response shapes before frontend work. | Versioned API notes in `Utkrisht.md`, CORS/authorization verified, return evidence saved, comparison persisted/retrievable, and a tested error contract. |
+
+## Sequencing
+
+1. **Utkrisht** publishes evidence-listing and comparison-read contracts before those screens consume them.
+2. **Abdul** builds the real inspection workflow and dashboard in parallel because create/get/list already exist.
+3. **Shreyash** completes capture and evidence upload against the published evidence contract.
+4. **Saahya** completes acknowledgement and lock once the review screen can surface inspection state.
+5. **Utkrisht** runs the single agreed Bedrock comparison verification only after baseline and return evidence exist.
+6. The team integrates comparison results and reports after the retrieval contract is stable.
+
+## Shared contracts and boundaries
+
+Keep these current contracts stable unless the owner and Utkrisht agree on a versioned change:
 
 ```ts
 type Role = 'owner' | 'renter'
 type AssetType = 'scooter' | 'bike' | 'apartment' | 'house'
-type InspectionType = 'move-in' | 'move-out'
+type InspectionType = 'move-in' | 'move-out' | 'handover'
 type InspectionStatus = 'in-progress' | 'awaiting-confirmation' | 'locked'
 
 interface User {
@@ -66,81 +112,12 @@ interface EvidenceMetadata {
 }
 ```
 
-## Saahya — authentication
+## Handover checklist
 
-Build `src/services/mock/authMock.ts`, `src/services/real/authReal.ts`, `src/services/authService.ts`, and `src/store/authStore.ts`; then complete `LoginPage.tsx`, `RegisterPage.tsx`, and route protection.
-
-Required facade:
-
-```ts
-signUp(name: string, email: string, password: string, role: Role): Promise<User>
-signIn(email: string, password: string): Promise<{ user: User; token: string }>
-signOut(): Promise<void>
-getCurrentUser(): Promise<User | null>
-getToken(): string | null
-```
-
-Mock mode stores a mock user/token in localStorage and exposes useful validation errors. Real mode must use the provided Cognito pool/client configuration, but do not wire or test it until Utku confirms the expected authentication model and callback/error contract.
-
-Your PR must include `Saahya.md`: completed work, mock test steps, exported types, and any integration question/blocker.
-
-## Abdul — inspections
-
-Build `src/services/mock/inspectionMock.ts`, `src/services/real/inspectionReal.ts`, `src/services/inspectionService.ts`, `src/store/inspectionStore.ts`, `src/utils/sessionCode.ts`, `src/config/constants.ts`, `CreateInspectionPage.tsx`, and `JoinInspectionPage.tsx`.
-
-Required facade:
-
-```ts
-createInspection(input: Pick<Inspection, 'assetType' | 'assetName' | 'inspectionType'>): Promise<Inspection>
-getInspection(id: string): Promise<Inspection>
-listInspections(userId: string): Promise<Inspection[]>
-joinInspection(sessionCode: string): Promise<Inspection>
-updateInspection(id: string, updates: Partial<Inspection>): Promise<Inspection>
-```
-
-Generate six-character uppercase codes without ambiguous characters (`0/O`, `1/I`, `5/S`, `8/B`). Include documented inspection areas for each asset type. The success state should show a session code and QR code; invalid-code and empty states are required.
-
-Your PR must include `Abdul.md`: completed work, mock test steps, inspection type/interface, session-code behaviour, and backend questions.
-
-## Shreyash — camera and evidence
-
-Build `useCamera`, `useGeolocation`, `useTelemetry`, `sha256`, anti-spoofing utilities, `CameraCapture`, `CaptureStatus`, and `CaptureScreen`.
-
-The camera experience is focused: large camera preview, a concise area instruction, step count, one capture control, and quiet readiness indicators. It does not display raw telemetry or hashes. Implement explicit states for camera denial, unavailable GPS, unsupported device sensors, and unsaved/upload-failed captures.
-
-Requirements:
-
-- Request camera and location permissions only in response to a user action.
-- Capture only from a live `MediaStream`; do not provide gallery upload as an alternative.
-- Hash captured blobs with Web Crypto.
-- Run one random tilt challenge per inspection; treat it as a signal, not proof.
-- Test on at least one physical mobile device and document browser limitations.
-
-Your PR must include `Shreyash.md`: completed work, mobile test steps, evidence shape, implemented checks, browser notes, and backend questions.
-
-## Utku — backend release gate
-
-The following AWS resources have been verified in `us-east-1`: Cognito pool `assettrace-users`, its app client, DynamoDB tables `AssetTrace-Inspections`, `AssetTrace-Evidence`, and `AssetTrace-Comparisons`, S3 bucket `assettrace-evidence-650687536843`, and IAM group `assettrace-devs` with all three teammate users.
-
-Before teammates can use real mode, complete and document all of the following:
-
-1. Deploy Lambda functions and an API Gateway API. No Lambda or API Gateway API exists at this handover.
-2. Configure a Cognito JWT authorizer and CORS for the frontend origin.
-3. Configure bucket CORS for browser `PUT` uploads to presigned URLs. It is currently absent.
-4. Define and share exact request/response shapes, error codes, authorization rules, and the API base URL.
-5. Implement endpoints: auth register/login; inspection create/list/get/join; evidence presigned upload URL and metadata save; acknowledge/lock; comparison trigger/get.
-6. Verify least-privilege Lambda roles, evidence ownership checks, and that a locked baseline cannot be changed.
-7. Add CloudWatch logs/error visibility and test the browser flow with `VITE_USE_MOCK=false`.
-
-Publish this in `Utkrisht.md` before requesting real-mode work: API base URL, endpoint contracts, auth/token handling, S3 upload CORS/headers, DynamoDB key/index assumptions, test instructions, and known limitations.
-
-## Merge and handover checklist
-
-Feature owners may work in parallel in mock mode now. Merge mock-mode work after review. Real adapters can be merged only after `U.md` is available and the lead has completed an integration test.
-
-- [ ] UI matches `DESIGN.md`.
-- [ ] Mock mode works with no AWS calls.
-- [ ] Loading, empty, validation, permission, and recovery states are covered where relevant.
-- [ ] `npm run build` and `npm run lint` pass.
-- [ ] Mobile layout is checked at 375px and 390px.
-- [ ] Handover note is included and scoped to the assigned feature.
+- [ ] Scope stayed within the assigned branch and files.
+- [ ] UI follows `DESIGN.md` and works at 375px and 390px.
+- [ ] Mock behavior still works where the feature has a mock adapter.
+- [ ] Real-mode requests use the authenticated facade and display backend errors plainly.
+- [ ] Loading, empty, validation, permission, and recovery states are covered.
+- [ ] Build and lint pass.
+- [ ] The owner’s handover note documents test steps, API assumptions, and blockers.

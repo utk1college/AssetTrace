@@ -33,3 +33,14 @@ export function isValidSessionCode(code: string): boolean {
     SESSION_CODE_CHARACTERS.includes(character),
   )
 }
+
+/**
+ * Validates codes supported by the deployed backend.
+ *
+ * New inspections use the unambiguous alphabet above. Existing inspections
+ * may have legacy UUID-derived hexadecimal codes, so real mode accepts both
+ * formats during the migration.
+ */
+export function isValidDeployedSessionCode(code: string): boolean {
+  return isValidSessionCode(code) || /^[0-9A-F]{6}$/.test(code)
+}

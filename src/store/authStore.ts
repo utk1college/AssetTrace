@@ -1,6 +1,6 @@
 import { create } from 'zustand'
 import authService from '@/services/authService'
-import type { Role, User } from '@/types/auth'
+import type { Role, SignUpResult, User } from '@/types/auth'
 
 interface AuthState {
   user: User | null
@@ -8,7 +8,8 @@ interface AuthState {
   isLoading: boolean
   error: string | null
   hydrate: () => Promise<void>
-  signUp: (name: string, email: string, password: string, role: Role) => Promise<User>
+  signUp: (name: string, email: string, password: string, role: Role) => Promise<SignUpResult>
+  confirmSignUp: (email: string, confirmationCode: string) => Promise<void>
   signIn: (email: string, password: string) => Promise<void>
   signOut: () => Promise<void>
   clearError: () => void
@@ -37,9 +38,21 @@ export const useAuthStore = create<AuthState>((set) => ({
   async signUp(name, email, password, role) {
     set({ isLoading: true, error: null })
     try {
-      const user = await authService.signUp(name, email, password, role)
+      const result = await authService.signUp(name, email, password, role)
       set({ isLoading: false })
-      return user
+      return result
+    } catch (error) {
+      const message = getErrorMessage(error)
+      set({ isLoading: false, error: message })
+      throw new Error(message)
+    }
+  },
+
+  async confirmSignUp(email, confirmationCode) {
+    set({ isLoading: true, error: null })
+    try {
+      await authService.confirmSignUp(email, confirmationCode)
+      set({ isLoading: false })
     } catch (error) {
       const message = getErrorMessage(error)
       set({ isLoading: false, error: message })

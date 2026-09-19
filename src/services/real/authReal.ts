@@ -1,18 +1,32 @@
 import { AuthError } from '@/types/auth'
-import type { AuthService, Role, User } from '@/types/auth'
+import type { AuthService, Role, SignUpResult, User } from '@/types/auth'
 
 interface ApiErrorResponse {
   error?: { code?: string; message?: string }
 }
 
 interface LoginResponse {
-  user: User
-  token?: string
-  accessToken?: string
-  idToken?: string
+  accessToken: string
+  idToken: string
+  refreshToken?: string
+}
+
+interface RegisterResponse {
+  userSub?: string
+  userConfirmed?: boolean
 }
 
 const endpoint = import.meta.env.VITE_API_ENDPOINT?.trim()
+const CURRENT_USER_KEY = 'assettrace.real.user'
+export const REAL_ACCESS_TOKEN_KEY = 'assettrace.real.access-token'
+
+interface IdTokenClaims {
+  sub?: unknown
+  email?: unknown
+  name?: unknown
+  role?: unknown
+  ['custom:role']?: unknown
+}
 
 function requireEndpoint(): string {
   if (!endpoint) throw new AuthError('Authentication service is not configured yet.')
@@ -36,11 +50,51 @@ async function request<T>(path: string, init: RequestInit): Promise<T> {
   return response.json() as Promise<T>
 }
 
+function decodeIdToken(idToken: string): User {
+  const parts = idToken.split('.')
+  if (parts.length !== 3) throw new AuthError('Login returned an invalid identity token.')
+
+  try {
+    const base64 = parts[1].replace(/-/g, '+').replace(/_/g, '/')
+    const bytes = Uint8Array.from(
+      atob(base64.padEnd(Math.ceil(base64.length / 4) * 4, '=')),
+      (character) => character.charCodeAt(0),
+    )
+    const payload = new TextDecoder().decode(bytes)
+    const claims = JSON.parse(payload) as IdTokenClaims
+    const id = typeof claims.sub === 'string' ? claims.sub : ''
+    const email = typeof claims.email === 'string' ? claims.email : ''
+    const name = typeof claims.name === 'string' ? claims.name : email
+    const roleClaim = claims['custom:role'] ?? claims.role
+    const role = roleClaim === 'owner' || roleClaim === 'renter' ? roleClaim : null
+
+    if (!id || !email || !name || !role) {
+      throw new AuthError('Login returned incomplete user information.')
+    }
+
+    return { id, name, email, role }
+  } catch (error) {
+    if (error instanceof AuthError) throw error
+    throw new AuthError('Login returned an invalid identity token.')
+  }
+}
+
 const realAuthService: AuthService = {
   async signUp(name, email, password, role: Role) {
-    return request<User>('/auth/register', {
+    const response = await request<RegisterResponse>('/auth/register', {
       method: 'POST',
       body: JSON.stringify({ name, email, password, role }),
+    })
+    return {
+      userSub: response.userSub,
+      userConfirmed: response.userConfirmed ?? false,
+    } satisfies SignUpResult
+  },
+
+  async confirmSignUp(email, confirmationCode) {
+    await request<{ confirmed: boolean }>('/auth/confirm', {
+      method: 'POST',
+      body: JSON.stringify({ email, confirmationCode }),
     })
   },
 
@@ -49,22 +103,37 @@ const realAuthService: AuthService = {
       method: 'POST',
       body: JSON.stringify({ email, password }),
     })
-    const token = response.token ?? response.accessToken ?? response.idToken
-    if (!token) throw new AuthError('Login succeeded but no access token was returned.')
-    return { user: response.user, token }
+    if (!response.accessToken || !response.idToken) {
+      throw new AuthError('Login succeeded but required authentication tokens were not returned.')
+    }
+
+    const user = decodeIdToken(response.idToken)
+    window.localStorage.setItem(CURRENT_USER_KEY, JSON.stringify(user))
+    window.localStorage.setItem(REAL_ACCESS_TOKEN_KEY, response.accessToken)
+    return { user, token: response.accessToken }
   },
 
   async signOut() {
-    await Promise.resolve()
+    window.localStorage.removeItem(CURRENT_USER_KEY)
+    window.localStorage.removeItem(REAL_ACCESS_TOKEN_KEY)
   },
 
   async getCurrentUser() {
-    await Promise.resolve()
-    return null
+    const storedUser = window.localStorage.getItem(CURRENT_USER_KEY)
+    const accessToken = window.localStorage.getItem(REAL_ACCESS_TOKEN_KEY)
+    if (!storedUser || !accessToken) return null
+
+    try {
+      return JSON.parse(storedUser) as User
+    } catch {
+      window.localStorage.removeItem(CURRENT_USER_KEY)
+      window.localStorage.removeItem(REAL_ACCESS_TOKEN_KEY)
+      return null
+    }
   },
 
   getToken() {
-    return null
+    return window.localStorage.getItem(REAL_ACCESS_TOKEN_KEY)
   },
 }
 

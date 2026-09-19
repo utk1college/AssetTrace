@@ -7,8 +7,15 @@ export interface User {
   role: Role
 }
 
+export interface SignUpResult {
+  user?: User
+  userSub?: string
+  userConfirmed: boolean
+}
+
 export interface AuthService {
-  signUp(name: string, email: string, password: string, role: Role): Promise<User>
+  signUp(name: string, email: string, password: string, role: Role): Promise<SignUpResult>
+  confirmSignUp(email: string, confirmationCode: string): Promise<void>
   signIn(email: string, password: string): Promise<{ user: User; token: string }>
   signOut(): Promise<void>
   getCurrentUser(): Promise<User | null>

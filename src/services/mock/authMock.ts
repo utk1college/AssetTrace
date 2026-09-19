@@ -69,7 +69,17 @@ const mockAuthService: AuthService = {
       password,
     }
     writeAccounts([...accounts, account])
-    return delay(withoutPassword(account))
+    return delay({
+      user: withoutPassword(account),
+      userConfirmed: true,
+    })
+  },
+
+  async confirmSignUp(_email, confirmationCode) {
+    if (!confirmationCode.trim()) {
+      throw new AuthError('Enter your confirmation code.')
+    }
+    await delay(undefined)
   },
 
   async signIn(email, password) {

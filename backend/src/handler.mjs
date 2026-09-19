@@ -1,4 +1,4 @@
-import { randomUUID } from 'node:crypto'
+import { randomInt, randomUUID } from 'node:crypto'
 import {
   CognitoIdentityProviderClient,
   ConfirmSignUpCommand,
@@ -49,6 +49,11 @@ const allowedImageTypes = new Map([
 ])
 const maxImageBytes = 25 * 1024 * 1024
 const maxImagesPerSide = 10
+const sessionCodeCharacters = 'ACDEFGHJKLMNPQRTUVWXYZ234679'
+
+function generateSessionCode() {
+  return Array.from({ length: 6 }, () => sessionCodeCharacters[randomInt(sessionCodeCharacters.length)]).join('')
+}
 
 function requireFields(value, fields) {
   for (const field of fields) if (!value[field]) throw Object.assign(new Error(`Missing required field: ${field}`), { statusCode: 400, code: 'INVALID_REQUEST' })
@@ -56,7 +61,7 @@ function requireFields(value, fields) {
 
 function inspectionItem(input, userId) {
   const id = randomUUID()
-  return { inspectionId: id, sk: `META#${id}`, entity: 'inspection', id, sessionCode: input.sessionCode ?? randomUUID().slice(0, 6).toUpperCase(), assetType: input.assetType, assetName: input.assetName, inspectionType: input.inspectionType, status: 'in-progress', ownerId: userId, areas: input.areas ?? [], completedAreaIds: [], createdAt: new Date().toISOString(), updatedAt: new Date().toISOString() }
+  return { inspectionId: id, sk: `META#${id}`, entity: 'inspection', id, sessionCode: input.sessionCode ?? generateSessionCode(), assetType: input.assetType, assetName: input.assetName, inspectionType: input.inspectionType, status: 'in-progress', ownerId: userId, areas: input.areas ?? [], completedAreaIds: [], createdAt: new Date().toISOString(), updatedAt: new Date().toISOString() }
 }
 
 async function createInspection(event) {
@@ -241,6 +246,7 @@ export async function handler(event) {
     const cognitoErrors = {
       UserNotFoundException: [401, 'INVALID_CREDENTIALS', 'The email or password is incorrect'],
       UserNotConfirmedException: [409, 'USER_NOT_CONFIRMED', 'Confirm your email before signing in'],
+      InvalidPasswordException: [400, 'INVALID_PASSWORD', 'Password must be at least 8 characters and include uppercase, lowercase, number, and symbol characters'],
       CodeMismatchException: [400, 'INVALID_CONFIRMATION_CODE', 'The confirmation code is invalid'],
       ExpiredCodeException: [400, 'EXPIRED_CONFIRMATION_CODE', 'The confirmation code has expired'],
       NotAuthorizedException: [401, 'INVALID_CREDENTIALS', 'The email or password is incorrect'],

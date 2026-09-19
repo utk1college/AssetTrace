@@ -9,7 +9,7 @@ export type AssetType =
   | 'apartment'
   | 'house'
 
-export type InspectionType = 'move-in' | 'move-out'
+export type InspectionType = 'move-in' | 'move-out' | 'handover'
 
 export type InspectionStatus =
   | 'in-progress'
