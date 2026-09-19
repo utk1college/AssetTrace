@@ -63,10 +63,10 @@ Every teammate should give their AI agent this context before starting work:
 6. For async work, include loading, empty, permission-denied, validation, and recovery states. Preserve an unsaved capture locally if upload fails.
 7. Validate with the prescribed checks, record exact manual test steps, and add a concise handover note containing completed work, files changed, API assumptions, and remaining blockers.
 
-## Completed ownership areas
+## Completed Ownership Areas
 
-| Area | Delivered result | Status |
-|---|---|---|---|---|
+| Area | Delivered Result | Status |
+|---|---|---|
 | Inspection workflow | Live dashboard, workflow, progress, checklist, and status navigation | Complete |
 | Evidence capture | Camera-only baseline/return capture, hashing, location, presigned upload, retry states | Complete |
 | Verification and lock | Photo review, acknowledgement, lock gating, immutable baseline behavior | Complete |
