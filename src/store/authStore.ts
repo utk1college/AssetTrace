@@ -1,6 +1,6 @@
 import { create } from 'zustand'
 import authService from '@/services/authService'
-import type { Role, SignUpResult, User } from '@/types/auth'
+import type { SignUpResult, User } from '@/types/auth'
 
 interface AuthState {
   user: User | null
@@ -8,7 +8,7 @@ interface AuthState {
   isLoading: boolean
   error: string | null
   hydrate: () => Promise<void>
-  signUp: (name: string, email: string, password: string, role: Role) => Promise<SignUpResult>
+  signUp: (name: string, email: string, password: string) => Promise<SignUpResult>
   confirmSignUp: (email: string, confirmationCode: string) => Promise<void>
   signIn: (email: string, password: string) => Promise<void>
   signOut: () => Promise<void>
@@ -35,10 +35,10 @@ export const useAuthStore = create<AuthState>((set) => ({
     }
   },
 
-  async signUp(name, email, password, role) {
+  async signUp(name, email, password) {
     set({ isLoading: true, error: null })
     try {
-      const result = await authService.signUp(name, email, password, role)
+      const result = await authService.signUp(name, email, password)
       set({ isLoading: false })
       return result
     } catch (error) {

@@ -66,11 +66,11 @@ function inspectionItem(input, userId) {
     ? input.capturePoints.map((point, order) => ({ id: point.id || randomUUID(), title: String(point.title ?? '').trim(), order })).filter((point) => point.title)
     : areas.map((title, order) => ({ id: `area-${order + 1}`, title, order }))
   if (!capturePoints.length) throw Object.assign(new Error('At least one photo title is required'), { statusCode: 400, code: 'INVALID_CAPTURE_POINTS' })
-  return { inspectionId: id, sk: `META#${id}`, entity: 'inspection', id, sessionCode: input.sessionCode ?? generateSessionCode(), assetType: input.assetType, assetName: input.assetName, inspectionType: input.inspectionType, status: 'in-progress', ownerId: userId, areas: capturePoints.map((point) => point.id), capturePoints, completedAreaIds: [], createdAt: new Date().toISOString(), updatedAt: new Date().toISOString() }
+    return { inspectionId: id, sk: `META#${id}`, entity: 'inspection', id, sessionCode: input.sessionCode ?? generateSessionCode(), assetType: input.assetType, assetName: input.assetName, inspectionType: input.inspectionType, status: 'in-progress', ownerId: input.sessionRole === 'owner' ? userId : undefined, renterId: input.sessionRole === 'renter' ? userId : undefined, areas: capturePoints.map((point) => point.id), capturePoints, completedAreaIds: [], createdAt: new Date().toISOString(), updatedAt: new Date().toISOString() }
 }
 
 async function createInspection(event) {
-  const input = bodyOf(event); const userId = userIdOf(event); requireFields(input, ['assetType', 'assetName', 'inspectionType'])
+  const input = bodyOf(event); const userId = userIdOf(event); requireFields(input, ['assetType', 'assetName', 'inspectionType', 'sessionRole'])
   const item = inspectionItem(input, userId)
   await dynamodb.send(new PutItemCommand({ TableName: config.inspectionsTable, Item: marshall(item, { removeUndefinedValues: true }) }))
   return ok(item, 201)
@@ -105,9 +105,11 @@ async function joinInspection(event) {
   const result = await dynamodb.send(new ScanCommand({ TableName: config.inspectionsTable, FilterExpression: '#sessionCode = :sessionCode', ExpressionAttributeNames: { '#sessionCode': 'sessionCode' }, ExpressionAttributeValues: { ':sessionCode': { S: input.sessionCode.toUpperCase() } } }))
   const item = result.Items?.[0] ? unmarshall(result.Items[0]) : null
   if (!item) return fail(404, 'INVALID_SESSION', 'Inspection session not found')
-  if (item.ownerId === userId) return fail(400, 'INVALID_PARTY', 'The owner cannot join their own inspection')
-  await dynamodb.send(new UpdateItemCommand({ TableName: config.inspectionsTable, Key: marshall({ inspectionId: item.inspectionId, sk: item.sk }), UpdateExpression: 'SET renterId = :renterId, updatedAt = :updatedAt', ExpressionAttributeValues: marshall({ ':renterId': userId, ':updatedAt': new Date().toISOString() }) }))
-  return ok({ ...item, renterId: userId })
+  if (item.ownerId === userId || item.renterId === userId) return fail(400, 'INVALID_PARTY', 'You are already part of this inspection')
+  const joinAs = item.ownerId ? 'renter' : 'owner'
+  const field = joinAs === 'owner' ? 'ownerId' : 'renterId'
+  await dynamodb.send(new UpdateItemCommand({ TableName: config.inspectionsTable, Key: marshall({ inspectionId: item.inspectionId, sk: item.sk }), UpdateExpression: `SET ${field} = :userId, updatedAt = :updatedAt`, ExpressionAttributeValues: marshall({ ':userId': userId, ':updatedAt': new Date().toISOString() }) }))
+  return ok({ ...item, [field]: userId })
 }
 
 async function acknowledge(event) {
@@ -266,8 +268,8 @@ async function auth(event) {
   }
   requireFields(input, ['email', 'password'])
   if (event.routeKey === 'POST /auth/register') {
-    requireFields(input, ['name', 'role'])
-    const response = await cognito.send(new SignUpCommand({ ClientId: config.userPoolClientId, Username: input.email, Password: input.password, UserAttributes: [{ Name: 'email', Value: input.email }, { Name: 'name', Value: input.name }, { Name: 'custom:role', Value: input.role }] }))
+    requireFields(input, ['name'])
+    const response = await cognito.send(new SignUpCommand({ ClientId: config.userPoolClientId, Username: input.email, Password: input.password, UserAttributes: [{ Name: 'email', Value: input.email }, { Name: 'name', Value: input.name }] }))
     return ok({ userSub: response.UserSub, userConfirmed: response.UserConfirmed }, 201)
   }
   const response = await cognito.send(new InitiateAuthCommand({ ClientId: config.userPoolClientId, AuthFlow: 'USER_PASSWORD_AUTH', AuthParameters: { USERNAME: input.email, PASSWORD: input.password } }))

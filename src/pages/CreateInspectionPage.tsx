@@ -9,6 +9,7 @@ import type {
   AssetType,
   InspectionType,
   CapturePoint,
+  SessionRole,
 } from '@/services/inspectionService'
 import { INSPECTION_AREAS } from '@/config/constants'
 
@@ -53,6 +54,7 @@ export default function CreateInspectionPage() {
   const [assetName, setAssetName] = useState('')
   const [inspectionType, setInspectionType] =
     useState<InspectionType>('move-in')
+  const [sessionRole, setSessionRole] = useState<SessionRole>('owner')
   const [capturePointTitles, setCapturePointTitles] = useState<string[]>(
     INSPECTION_AREAS.scooter.map((title) => title.replace(/-/g, ' ')),
   )
@@ -76,6 +78,7 @@ export default function CreateInspectionPage() {
         assetType,
         assetName,
         inspectionType,
+        sessionRole,
         capturePoints: titles.map((title, order): CapturePoint => ({
           id: `capture-${crypto.randomUUID()}`,
           title,
@@ -251,6 +254,18 @@ export default function CreateInspectionPage() {
                   </button>
                 )
               })}
+            </div>
+          </section>
+
+          <section>
+            <h2 className="section-label mb-3">YOUR ROLE IN THIS SESSION</h2>
+            <div className="grid grid-cols-2 gap-3">
+              {(['owner', 'renter'] as const).map((role) => (
+                <button key={role} type="button" aria-pressed={sessionRole === role} onClick={() => setSessionRole(role)} className={`min-h-20 rounded-xl border p-4 text-left ${sessionRole === role ? 'border-[var(--accent)] bg-white ring-1 ring-[var(--accent)]' : 'border-[var(--border)] bg-white'}`}>
+                  <p className="text-subheading">{role === 'owner' ? 'Owner' : 'Renter'}</p>
+                  <p className="text-small mt-1">{role === 'owner' ? 'I am lending this asset.' : 'I am receiving this asset.'}</p>
+                </button>
+              ))}
             </div>
           </section>
 

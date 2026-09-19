@@ -151,7 +151,8 @@ export async function createInspection(
     assetName,
     inspectionType: input.inspectionType,
     status: "in-progress",
-    ownerId: MOCK_OWNER_ID,
+      ownerId: input.sessionRole === "owner" ? MOCK_OWNER_ID : undefined,
+    renterId: input.sessionRole === "renter" ? MOCK_RENTER_ID : undefined,
     areas,
     capturePoints,
     completedAreaIds: [],
@@ -159,8 +160,11 @@ export async function createInspection(
     acknowledgements: {},
   };
 
-  const currentUser = await authService.getCurrentUser();
-  if (currentUser) inspection.ownerId = currentUser.id;
+    const currentUser = await authService.getCurrentUser();
+    if (currentUser) {
+      if (input.sessionRole === "owner") inspection.ownerId = currentUser.id;
+      else inspection.renterId = currentUser.id;
+    }
 
   inspections.push(inspection);
   writeInspections(inspections);
@@ -440,7 +444,7 @@ export async function lockInspection(id: string): Promise<Inspection> {
   if (index === -1) throw new Error("Inspection not found.");
 
   const current = inspections[index];
-  const ownerAcknowledged = Boolean(current.acknowledgements?.[current.ownerId]);
+  const ownerAcknowledged = Boolean(current.ownerId && current.acknowledgements?.[current.ownerId]);
   const renterAcknowledged = Boolean(
     current.renterId && current.acknowledgements?.[current.renterId],
   );

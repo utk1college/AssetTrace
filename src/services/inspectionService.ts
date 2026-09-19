@@ -3,6 +3,8 @@ import * as inspectionReal from "./real/inspectionReal";
 
 export type Role = "owner" | "renter";
 
+export type SessionRole = Role;
+
 export type AssetType = "scooter" | "bike" | "apartment" | "house";
 
 export type InspectionType = "move-in" | "move-out" | "handover";
@@ -93,7 +95,7 @@ export interface Inspection {
   assetName: string;
   inspectionType: InspectionType;
   status: InspectionStatus;
-  ownerId: string;
+  ownerId?: string;
   renterId?: string;
   areas: string[];
   capturePoints: CapturePoint[];
@@ -112,7 +114,7 @@ export interface CapturePoint {
 export type CreateInspectionInput = Pick<
   Inspection,
   "assetType" | "assetName" | "inspectionType"
-> & { capturePoints?: CapturePoint[] };
+> & { capturePoints?: CapturePoint[]; sessionRole: SessionRole };
 
 const useMock = import.meta.env.VITE_USE_MOCK !== "false";
 

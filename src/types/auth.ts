@@ -4,7 +4,6 @@ export interface User {
   id: string
   name: string
   email: string
-  role: Role
 }
 
 export interface SignUpResult {
@@ -14,7 +13,7 @@ export interface SignUpResult {
 }
 
 export interface AuthService {
-  signUp(name: string, email: string, password: string, role: Role): Promise<SignUpResult>
+  signUp(name: string, email: string, password: string): Promise<SignUpResult>
   confirmSignUp(email: string, confirmationCode: string): Promise<void>
   signIn(email: string, password: string): Promise<{ user: User; token: string }>
   signOut(): Promise<void>

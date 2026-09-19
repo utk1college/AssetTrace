@@ -164,7 +164,7 @@ function inspectionFromApi(value: ApiInspection): Inspection {
     assetName: stringField(value.assetName, "assetName"),
     inspectionType,
     status,
-    ownerId: stringField(value.ownerId, "ownerId"),
+    ownerId: typeof value.ownerId === "string" ? value.ownerId : undefined,
     renterId: typeof value.renterId === "string" ? value.renterId : undefined,
     areas,
     capturePoints,

@@ -1,5 +1,5 @@
 import { AuthError } from '@/types/auth'
-import type { AuthService, Role, User } from '@/types/auth'
+import type { AuthService, User } from '@/types/auth'
 
 interface MockAccount extends User {
   password: string
@@ -44,16 +44,15 @@ function validateCredentials(email: string, password: string): void {
   if (!password) throw new AuthError('Enter your password.')
 }
 
-function validateRegistration(name: string, email: string, password: string, role: Role): void {
+function validateRegistration(name: string, email: string, password: string): void {
   if (!name.trim()) throw new AuthError('Enter your name.')
   validateCredentials(email, password)
   if (password.length < 8) throw new AuthError('Password must be at least 8 characters.')
-  if (role !== 'owner' && role !== 'renter') throw new AuthError('Choose an account type.')
 }
 
 const mockAuthService: AuthService = {
-  async signUp(name, email, password, role) {
-    validateRegistration(name, email, password, role)
+  async signUp(name, email, password) {
+    validateRegistration(name, email, password)
     const normalizedEmail = normalizeEmail(email)
     const accounts = readAccounts()
 
@@ -65,7 +64,6 @@ const mockAuthService: AuthService = {
       id: `mock-user-${crypto.randomUUID()}`,
       name: name.trim(),
       email: normalizedEmail,
-      role,
       password,
     }
     writeAccounts([...accounts, account])

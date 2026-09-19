@@ -1,5 +1,5 @@
 import { AuthError } from '@/types/auth'
-import type { AuthService, Role, SignUpResult, User } from '@/types/auth'
+import type { AuthService, SignUpResult, User } from '@/types/auth'
 
 interface ApiErrorResponse {
   error?: { code?: string; message?: string }
@@ -30,8 +30,6 @@ interface IdTokenClaims {
   sub?: unknown
   email?: unknown
   name?: unknown
-  role?: unknown
-  ['custom:role']?: unknown
 }
 
 function requireEndpoint(): string {
@@ -71,14 +69,11 @@ function decodeIdToken(idToken: string): User {
     const id = typeof claims.sub === 'string' ? claims.sub : ''
     const email = typeof claims.email === 'string' ? claims.email : ''
     const name = typeof claims.name === 'string' ? claims.name : email
-    const roleClaim = claims['custom:role'] ?? claims.role
-    const role = roleClaim === 'owner' || roleClaim === 'renter' ? roleClaim : null
-
-    if (!id || !email || !name || !role) {
+    if (!id || !email || !name) {
       throw new AuthError('Login returned incomplete user information.')
     }
 
-    return { id, name, email, role }
+    return { id, name, email }
   } catch (error) {
     if (error instanceof AuthError) throw error
     throw new AuthError('Login returned an invalid identity token.')
@@ -86,10 +81,10 @@ function decodeIdToken(idToken: string): User {
 }
 
 const realAuthService: AuthService = {
-  async signUp(name, email, password, role: Role) {
+  async signUp(name, email, password) {
     const response = await request<RegisterResponse>('/auth/register', {
       method: 'POST',
-      body: JSON.stringify({ name, email, password, role }),
+      body: JSON.stringify({ name, email, password }),
     })
     return {
       userSub: response.userSub,

@@ -142,7 +142,7 @@ useEffect(() => {
                 <InspectionCard
                   key={inspection.id}
                   inspection={inspection}
-                  userRole={user?.role}
+                  userId={user?.id}
                 />
               ))}
             </div>
@@ -183,10 +183,10 @@ useEffect(() => {
 
 function InspectionCard({
   inspection,
-  userRole,
+  userId,
 }: {
   inspection: Inspection
-  userRole?: 'owner' | 'renter'
+    userId?: string
 }) {
   const Icon = ASSET_ICONS[inspection.assetType]
 
@@ -203,12 +203,9 @@ function InspectionCard({
 
   const status = getStatusDisplay(inspection.status)
 
-  const participant =
-    userRole === 'owner'
-      ? inspection.renterId
-        ? 'Renter joined'
-        : 'Awaiting renter'
-      : 'Owner'
+    const participant = userId === inspection.ownerId
+      ? `Owner${inspection.renterId ? ' · Renter joined' : ' · Awaiting renter'}`
+      : `Renter${inspection.ownerId ? ' · Owner joined' : ' · Awaiting owner'}`
 
   return (
     <Link
