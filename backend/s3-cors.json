@@ -1,7 +1,10 @@
 {
   "CORSRules": [
     {
-      "AllowedOrigins": ["http://localhost:5173"],
+      "AllowedOrigins": [
+        "http://localhost:5173",
+        "https://assettrace.d2re85crrtyc3z.amplifyapp.com"
+      ],
       "AllowedMethods": ["PUT", "GET", "HEAD"],
       "AllowedHeaders": ["*"],
       "ExposeHeaders": ["ETag"],
