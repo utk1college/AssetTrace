@@ -40,8 +40,9 @@ export default function ContextVideoCapture({ assetType, onRecorded, isSaving = 
       return;
     }
     chunksRef.current = [];
-    const mimeType = MediaRecorder.isTypeSupported("video/webm;codecs=vp8") ? "video/webm;codecs=vp8" : "video/webm";
-    const recorder = new MediaRecorder(streamRef.current, { mimeType });
+    const mimeType = ["video/webm;codecs=vp8", "video/webm", "video/mp4", "video/quicktime"].find((candidate) => MediaRecorder.isTypeSupported(candidate));
+    try {
+      const recorder = mimeType ? new MediaRecorder(streamRef.current, { mimeType }) : new MediaRecorder(streamRef.current);
     recorder.ondataavailable = (event) => { if (event.data.size) chunksRef.current.push(event.data); };
     recorder.onstop = () => {
       const duration = Math.max(1, Math.round((Date.now() - startedAtRef.current) / 1000));
@@ -53,6 +54,9 @@ export default function ContextVideoCapture({ assetType, onRecorded, isSaving = 
     recorder.start();
     setRecording(true);
     window.setTimeout(() => { if (recorder.state === "recording") recorder.stop(); }, 15000);
+    } catch {
+      setError("This browser could not start video recording. Try the camera again or use another browser.");
+    }
   }
 
   useEffect(() => {

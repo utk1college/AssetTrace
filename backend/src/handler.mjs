@@ -179,7 +179,7 @@ async function saveEvidence(event) {
     await dynamodb.send(new UpdateItemCommand({ TableName: config.inspectionsTable, Key: marshall({ inspectionId: id, sk: item.sk }), UpdateExpression: 'SET completedAreaIds = list_append(if_not_exists(completedAreaIds, :empty), :area), updatedAt = :updatedAt', ExpressionAttributeValues: marshall({ ':empty': [], ':area': [input.areaId], ':updatedAt': new Date().toISOString() }) }))
   }
   if (phase === 'return' && isContextVideo) {
-    const saved = await dynamodb.send(new ScanCommand({ TableName: config.evidenceTable, FilterExpression: 'inspectionId = :inspectionId AND phase = :phase', ExpressionAttributeValues: { ':inspectionId': { S: id }, ':phase': { S: 'return' } } }))
+    const saved = await dynamodb.send(new ScanCommand({ TableName: config.evidenceTable, ConsistentRead: true, FilterExpression: 'inspectionId = :inspectionId AND phase = :phase', ExpressionAttributeValues: { ':inspectionId': { S: id }, ':phase': { S: 'return' } } }))
     const savedEvidence = (saved.Items ?? []).map(unmarshall)
     const completed = new Set(savedEvidence.filter((record) => record.mediaType !== 'video').map((record) => record.areaId))
     if (capturePointsFor(item).every((point) => completed.has(point.id)) && savedEvidence.some((record) => record.mediaType === 'video')) {

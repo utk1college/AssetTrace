@@ -25,6 +25,8 @@ export default function CaptureScreen() {
   const [assetType, setAssetType] = useState<"scooter" | "bike" | "apartment" | "house" | "wall">("bike");
   const [videoSaved, setVideoSaved] = useState(false);
   const [isVideoSaving, setIsVideoSaving] = useState(false);
+  const [pendingVideo, setPendingVideo] = useState<Blob | null>(null);
+  const [pendingVideoDuration, setPendingVideoDuration] = useState(0);
 
   useEffect(() => {
     const timer = window.setTimeout(() => {
@@ -142,6 +144,8 @@ export default function CaptureScreen() {
   }
   async function saveContextVideo(file: Blob, durationSeconds: number) {
     if (!id) return;
+    setPendingVideo(file);
+    setPendingVideoDuration(durationSeconds);
     setIsVideoSaving(true);
     setError(null);
     try {
@@ -150,6 +154,7 @@ export default function CaptureScreen() {
       await inspectionService.uploadEvidence(upload.uploadUrl, file, file.type);
       await inspectionService.saveEvidence(id, { evidenceId: upload.evidenceId, areaId: "context-video", capturePointId: "context-video", capturePointTitle: "Context video", phase, key: upload.key, sha256, capturedAt: new Date().toISOString(), location, suspicious: false, mediaType: "video", durationSeconds });
       setVideoSaved(true);
+      setPendingVideo(null);
     } catch {
       setError("Unable to save the context video. Please try again.");
     } finally {
@@ -159,7 +164,7 @@ export default function CaptureScreen() {
   if (isComplete) {
     return (
       <main className="container py-6">
-        {!videoSaved ? <><h1 className="text-xl font-semibold text-[var(--text)]">Photos complete</h1><p className="mt-2 text-sm text-[var(--text-secondary)]">Add one short context video before continuing.</p>{error && <p className="mt-3 text-sm text-[var(--error)]" role="alert">{error}</p>}<div className="mt-5"><ContextVideoCapture assetType={assetType} onRecorded={saveContextVideo} isSaving={isVideoSaving} /></div></> : <><h1 className="text-xl font-semibold text-[var(--text)]">Capture complete</h1><p className="mt-2 text-sm text-[var(--text-secondary)]">Photos and context video recorded for the {phase} phase.</p><button type="button" className="btn btn-primary mt-5 w-full" onClick={() => navigate(phase === "return" ? `/inspections/${id}/compare` : `/inspections/${id}/review`)}>{phase === "return" ? "Review comparison" : "Review baseline"}</button></>}
+        {!videoSaved ? <><h1 className="text-xl font-semibold text-[var(--text)]">Photos complete</h1><p className="mt-2 text-sm text-[var(--text-secondary)]">Add one short context video before continuing.</p>{error && <p className="mt-3 text-sm text-[var(--error)]" role="alert">{error}</p>}{pendingVideo && error && <button type="button" className="mt-2 text-sm font-medium text-[var(--accent)]" onClick={() => void saveContextVideo(pendingVideo, pendingVideoDuration)} disabled={isVideoSaving}>Try saving the recorded video again</button>}<div className="mt-5"><ContextVideoCapture assetType={assetType} onRecorded={saveContextVideo} isSaving={isVideoSaving} /></div></> : <><h1 className="text-xl font-semibold text-[var(--text)]">Capture complete</h1><p className="mt-2 text-sm text-[var(--text-secondary)]">Photos and context video recorded for the {phase} phase.</p><button type="button" className="btn btn-primary mt-5 w-full" onClick={() => navigate(phase === "return" ? `/inspections/${id}/compare` : `/inspections/${id}/review`)}>{phase === "return" ? "Review comparison" : "Review baseline"}</button></>}
       </main>
     );
   }
