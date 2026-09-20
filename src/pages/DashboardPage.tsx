@@ -7,6 +7,7 @@ import {
   House,
   Plus,
   Square,
+  Wrench,
 } from 'lucide-react'
 import type { LucideIcon } from 'lucide-react'
 
@@ -26,6 +27,7 @@ const ASSET_ICONS: Record<AssetType, LucideIcon> = {
   apartment: Building2,
   house: House,
   wall: Square,
+  custom: Wrench,
 }
 const ASSET_LABELS: Record<AssetType, string> = {
   scooter: 'Scooter',
@@ -33,6 +35,7 @@ const ASSET_LABELS: Record<AssetType, string> = {
   apartment: 'Apartment',
   house: 'House',
   wall: 'Wall',
+  custom: 'Custom asset',
 }
 
 export default function DashboardPage() {
@@ -210,7 +213,7 @@ function InspectionCard({
           </div>
 
           <p className="text-small truncate">
-            {ASSET_LABELS[inspection.assetType]} · {participant}
+            {inspection.assetType === 'custom' ? inspection.customAssetType || ASSET_LABELS.custom : ASSET_LABELS[inspection.assetType]} · {participant}
           </p>
           <p className="text-small mt-1 font-medium text-[var(--text-primary)]">{stage}</p>
         </div>

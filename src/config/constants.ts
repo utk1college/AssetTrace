@@ -49,4 +49,6 @@ export const INSPECTION_AREAS = {
     'Right section',
     'Lower edge',
   ],
+
+  custom: [],
 } as const

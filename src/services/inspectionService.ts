@@ -5,7 +5,7 @@ export type Role = "owner" | "renter";
 
 export type SessionRole = Role;
 
-export type AssetType = "scooter" | "bike" | "apartment" | "house" | "wall";
+export type AssetType = "scooter" | "bike" | "apartment" | "house" | "wall" | "custom";
 
 export type InspectionType = "move-in" | "move-out" | "handover";
 
@@ -100,6 +100,7 @@ export interface Inspection {
   sessionCode: string;
   assetType: AssetType;
   assetName: string;
+  customAssetType?: string;
   inspectionType: InspectionType;
   status: InspectionStatus;
   ownerId?: string;
@@ -121,7 +122,7 @@ export interface CapturePoint {
 
 export type CreateInspectionInput = Pick<
   Inspection,
-  "assetType" | "assetName" | "inspectionType"
+  "assetType" | "assetName" | "inspectionType" | "customAssetType"
 > & { capturePoints?: CapturePoint[]; sessionRole: SessionRole };
 
 const useMock = import.meta.env.VITE_USE_MOCK !== "false";

@@ -22,7 +22,7 @@ export default function CaptureScreen() {
   const [isComplete, setIsComplete] = useState(false);
   const [pendingFile, setPendingFile] = useState<Blob | null>(null);
   const [locationRecorded, setLocationRecorded] = useState(false);
-  const [assetType, setAssetType] = useState<"scooter" | "bike" | "apartment" | "house" | "wall">("bike");
+  const [assetType, setAssetType] = useState<"scooter" | "bike" | "apartment" | "house" | "wall" | "custom">("bike");
   const [videoSaved, setVideoSaved] = useState(false);
   const [isVideoSaving, setIsVideoSaving] = useState(false);
   const [pendingVideo, setPendingVideo] = useState<Blob | null>(null);

@@ -1,5 +1,5 @@
 ﻿import { useState } from 'react'
-import { ArrowRight, Bike, Building2, Check, Copy, House, Plus, Square, Trash2 } from 'lucide-react'
+import { ArrowRight, Bike, Building2, Check, Copy, House, Plus, Square, Trash2, Wrench } from 'lucide-react'
 import { QRCodeSVG } from 'qrcode.react'
 import { useNavigate } from 'react-router-dom'
 
@@ -25,6 +25,7 @@ const ASSET_OPTIONS: {
   { value: 'apartment', label: 'Apartment', description: 'Record rooms as they change hands.', icon: Building2 },
   { value: 'house', label: 'House', description: 'Build a clear condition record.', icon: House },
   { value: 'wall', label: 'Wall', description: 'Scan one surface for visible change.', icon: Square },
+  { value: 'custom', label: 'Custom category', description: 'Name your asset and define every photo title.', icon: Wrench },
 ]
 
 const INSPECTION_OPTIONS: {
@@ -34,13 +35,13 @@ const INSPECTION_OPTIONS: {
 }[] = [
   {
     value: 'move-in',
-    label: 'Move-in',
-    description: 'Record the condition at handover.',
+    label: 'Initial condition',
+    description: 'Record the asset before it changes hands.',
   },
   {
     value: 'move-out',
-    label: 'Move-out',
-    description: 'Record the condition when returning the asset.',
+    label: 'Return condition',
+    description: 'Record the asset after use or return.',
   },
 ]
 
@@ -55,6 +56,7 @@ export default function CreateInspectionPage() {
   const error = useInspectionStore((state) => state.error)
 
   const [assetType, setAssetType] = useState<AssetType>('scooter')
+  const [customAssetType, setCustomAssetType] = useState('')
   const [assetName, setAssetName] = useState('')
   const [inspectionType, setInspectionType] =
     useState<InspectionType>('move-in')
@@ -80,6 +82,7 @@ export default function CreateInspectionPage() {
     try {
       const inspection = await createInspection({
         assetType,
+        customAssetType: assetType === 'custom' ? customAssetType.trim() : undefined,
         assetName,
         inspectionType,
         sessionRole,
@@ -133,6 +136,8 @@ export default function CreateInspectionPage() {
                     <House aria-hidden="true" />
                   ) : assetType === 'wall' ? (
                     <Square aria-hidden="true" />
+                  ) : assetType === 'custom' ? (
+                    <Wrench aria-hidden="true" />
                   ) : (
                     <Bike aria-hidden="true" />
                   )}
@@ -226,7 +231,19 @@ export default function CreateInspectionPage() {
 
         <form onSubmit={handleSubmit} className="space-y-8">
           <section>
-            <h2 className="section-label mb-3">ASSET TYPE</h2>
+            <h2 className="section-label mb-3">YOUR ROLE IN THIS SESSION</h2>
+            <div className="grid grid-cols-2 gap-3">
+              {(['owner', 'renter'] as const).map((role) => (
+                <button key={role} type="button" aria-pressed={sessionRole === role} onClick={() => setSessionRole(role)} className={`min-h-20 rounded-xl border p-4 text-left ${sessionRole === role ? 'border-[var(--accent)] bg-white ring-1 ring-[var(--accent)]' : 'border-[var(--border)] bg-white'}`}>
+                  <p className="text-subheading">{role === 'owner' ? 'Owner' : 'Renter'}</p>
+                  <p className="text-small mt-1">{role === 'owner' ? 'I am lending this asset.' : 'I am receiving this asset.'}</p>
+                </button>
+              ))}
+            </div>
+          </section>
+
+          <section>
+            <h2 className="section-label mb-3">ASSET CATEGORY</h2>
 
             <div className="grid grid-cols-2 gap-3">
               {ASSET_OPTIONS.map((option) => {
@@ -263,18 +280,7 @@ export default function CreateInspectionPage() {
                 )
               })}
             </div>
-          </section>
-
-          <section>
-            <h2 className="section-label mb-3">YOUR ROLE IN THIS SESSION</h2>
-            <div className="grid grid-cols-2 gap-3">
-              {(['owner', 'renter'] as const).map((role) => (
-                <button key={role} type="button" aria-pressed={sessionRole === role} onClick={() => setSessionRole(role)} className={`min-h-20 rounded-xl border p-4 text-left ${sessionRole === role ? 'border-[var(--accent)] bg-white ring-1 ring-[var(--accent)]' : 'border-[var(--border)] bg-white'}`}>
-                  <p className="text-subheading">{role === 'owner' ? 'Owner' : 'Renter'}</p>
-                  <p className="text-small mt-1">{role === 'owner' ? 'I am lending this asset.' : 'I am receiving this asset.'}</p>
-                </button>
-              ))}
-            </div>
+            {assetType === 'custom' && <div className="mt-4"><label htmlFor="custom-category" className="section-label mb-2 block">YOUR CATEGORY</label><input id="custom-category" value={customAssetType} onChange={(event) => setCustomAssetType(event.target.value)} placeholder="e.g. Office desk" className="input" required /></div>}
           </section>
 
           <section>

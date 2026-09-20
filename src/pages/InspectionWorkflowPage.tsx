@@ -6,6 +6,7 @@ import {
   House,
   RotateCcw,
   Square,
+  Wrench,
 } from 'lucide-react'
 import type { LucideIcon } from 'lucide-react'
 import { useNavigate, useParams } from 'react-router-dom'
@@ -24,6 +25,7 @@ const ASSET_ICONS: Record<AssetType, LucideIcon> = {
   apartment: Building2,
   house: House,
   wall: Square,
+  custom: Wrench,
 }
 
 const ASSET_LABELS: Record<AssetType, string> = {
@@ -32,6 +34,7 @@ const ASSET_LABELS: Record<AssetType, string> = {
   apartment: 'Apartment',
   house: 'House',
   wall: 'Wall',
+  custom: 'Custom asset',
 }
 
 export default function InspectionWorkflowPage() {
@@ -130,7 +133,7 @@ export default function InspectionWorkflowPage() {
 
               <div className="min-w-0 flex-1">
                 <p className="text-subheading">
-                  {ASSET_LABELS[inspection.assetType]}
+                  {inspection.assetType === 'custom' ? inspection.customAssetType || ASSET_LABELS.custom : ASSET_LABELS[inspection.assetType]}
                 </p>
 
                 <p className="text-small mt-1">

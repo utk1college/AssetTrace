@@ -67,7 +67,7 @@ function inspectionItem(input, userId) {
     ? input.capturePoints.map((point, order) => ({ id: point.id || randomUUID(), title: String(point.title ?? '').trim(), order })).filter((point) => point.title)
     : areas.map((title, order) => ({ id: `area-${order + 1}`, title, order }))
   if (!capturePoints.length) throw Object.assign(new Error('At least one photo title is required'), { statusCode: 400, code: 'INVALID_CAPTURE_POINTS' })
-    return { inspectionId: id, sk: `META#${id}`, entity: 'inspection', id, sessionCode: input.sessionCode ?? generateSessionCode(), assetType: input.assetType, assetName: input.assetName, inspectionType: input.inspectionType, status: 'in-progress', ownerId: input.sessionRole === 'owner' ? userId : undefined, renterId: input.sessionRole === 'renter' ? userId : undefined, areas: capturePoints.map((point) => point.id), capturePoints, completedAreaIds: [], createdAt: new Date().toISOString(), updatedAt: new Date().toISOString() }
+    return { inspectionId: id, sk: `META#${id}`, entity: 'inspection', id, sessionCode: input.sessionCode ?? generateSessionCode(), assetType: input.assetType, customAssetType: input.customAssetType, assetName: input.assetName, inspectionType: input.inspectionType, status: 'in-progress', ownerId: input.sessionRole === 'owner' ? userId : undefined, renterId: input.sessionRole === 'renter' ? userId : undefined, areas: capturePoints.map((point) => point.id), capturePoints, completedAreaIds: [], createdAt: new Date().toISOString(), updatedAt: new Date().toISOString() }
 }
 
 async function createInspection(event) {

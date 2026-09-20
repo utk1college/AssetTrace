@@ -148,6 +148,7 @@ export async function createInspection(
     id: createId(),
     sessionCode: generateUniqueSessionCode(inspections),
     assetType: input.assetType,
+    customAssetType: input.customAssetType,
     assetName,
     inspectionType: input.inspectionType,
     status: "in-progress",

@@ -22,6 +22,7 @@ interface ApiInspection {
   sessionCode?: unknown;
   assetType?: unknown;
   assetName?: unknown;
+  customAssetType?: unknown;
   inspectionType?: unknown;
   status?: unknown;
   ownerId?: unknown;
@@ -133,7 +134,8 @@ function inspectionFromApi(value: ApiInspection): Inspection {
     assetType !== "bike" &&
     assetType !== "apartment" &&
     assetType !== "house" &&
-    assetType !== "wall"
+    assetType !== "wall" &&
+    assetType !== "custom"
   ) {
     throw new Error("Inspection response contains an unsupported asset type.");
   }
@@ -164,6 +166,7 @@ function inspectionFromApi(value: ApiInspection): Inspection {
     sessionCode: stringField(value.sessionCode, "sessionCode"),
     assetType,
     assetName: stringField(value.assetName, "assetName"),
+    customAssetType: typeof value.customAssetType === "string" ? value.customAssetType : undefined,
     inspectionType,
     status,
     ownerId: typeof value.ownerId === "string" ? value.ownerId : undefined,

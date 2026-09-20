@@ -1,5 +1,5 @@
 ﻿import { useState } from 'react'
-import { ArrowRight, Bike, Building2, House, Square } from 'lucide-react'
+import { ArrowRight, Bike, Building2, House, Square, Wrench } from 'lucide-react'
 import { useNavigate } from 'react-router-dom'
 
 import PrimaryButton from '@/components/ui/PrimaryButton'
@@ -16,6 +16,7 @@ const ASSET_ICONS: Record<Inspection['assetType'], typeof Bike> = {
   apartment: Building2,
   house: House,
   wall: Square,
+  custom: Wrench,
 }
 
 export default function JoinInspectionPage() {
@@ -99,7 +100,7 @@ export default function JoinInspectionPage() {
 
                   <p className="text-small">
                     <span className="capitalize">
-                      {joinedInspection.assetType}
+                      {joinedInspection.assetType === 'custom' ? joinedInspection.customAssetType || 'Custom asset' : joinedInspection.assetType}
                     </span>
                     {' · '}
                     <span>
