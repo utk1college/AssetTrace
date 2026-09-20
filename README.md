@@ -238,7 +238,6 @@ As an MVP, several production-grade enhancements are intentionally left for futu
 - Persistent device telemetry
 - Stronger participant identity
 - Database indexing & scalability improvements
-- Production security hardening
 - Automated suspicious-capture detection
 - Cost & performance optimization
 
@@ -248,7 +247,7 @@ As an MVP, several production-grade enhancements are intentionally left for futu
 
 | Name |
 |---|
-| `Utkrisht Umang` |
-| `Saahya K S` |
-| `Abdul Ahad` |
-| `Shreyash Shaurya` |
+| Utkrisht Umang |
+| Saahya K S |
+| Abdul Ahad |
+| Shreyash Shaurya |
