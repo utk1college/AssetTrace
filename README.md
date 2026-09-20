@@ -230,17 +230,18 @@ Mobile-first, calm, and evidence before decoration. White cards on a `#F7F7F8` s
 - **Camera, GPS and video only work over HTTPS.** Testing on real phones taught us that these browser APIs need a secure context, which is why the hosted build on Amplify became part of our workflow instead of a last-minute step.
 - **A mock mode let four people build in parallel.** Putting a service facade in front of mock and real adapters meant everyone could work on the UI without touching billable AWS resources, and we could switch to the real backend with a single flag.
 
-## Known limitations
+### Future Scope
 
-We would rather be upfront about these than have you find them.
+As an MVP, several production-grade enhancements are intentionally left for future iterations if AssetTrace moves toward real-world deployment:
 
-- **Objections are a placeholder.** The Renter's "object" action in baseline review shows an alert but does not persist or notify.
-- **Reports are in-app only.** There is no PDF or file export yet.
-- **Device telemetry is not persisted.** Orientation and motion are collected in the camera component but are not part of the saved evidence metadata. Geolocation is saved when permission is granted.
-- **The other party's name is not shown.** The UI identifies participants by role and joined state.
-- **Some lookups use DynamoDB `Scan`.** Session-code, owner and evidence lookups should move to indexed queries (GSIs) before real traffic.
-- **Hardening still to do for production.** CORS is currently `*` in the template default (the S3 bucket CORS is already restricted to the app origin), `bedrock:InvokeModel` is granted on `*` and should be scoped to the specific model, and a suspicious-capture signal exists in the data model but is currently always `false`.
-- **Cost.** Each comparison is a Bedrock call. It is owner-triggered only.
+- Advanced dispute & objection handling
+- PDF/exportable reports
+- Persistent device telemetry
+- Stronger participant identity
+- Database indexing & scalability improvements
+- Production security hardening
+- Automated suspicious-capture detection
+- Cost & performance optimization
 
 ## Roadmap
 
@@ -250,13 +251,9 @@ Persisted objections with notifications, downloadable PDF condition reports, ind
 
 **Pandoras Box**
 
-| Name | Role |
-|---|---|
-| `<name>` | `<role>` |
-| `<name>` | `<role>` |
-| `<name>` | `<role>` |
-| `<name>` | `<role>` |
-
-## Contributing
-
-Create a feature branch, keep development in mock mode by default, run `npm run build` and `npm run lint`, and open a pull request against `main` describing how you tested it. Never commit `.env.local`, AWS credentials or secrets. Do not create or change AWS resources that can incur charges without the team lead's approval.
+| Name |
+|---|
+| `Utkrisht Umang` |
+| `Saahya K S` |
+| `Abdul Ahad` |
+| `Shreyash Shaurya` |
