@@ -7,7 +7,7 @@ Built by **Team Pandoras Box** for **First Commit** (WeMakeDevs × AWS, Bharat B
 | | |
 |---|---|
 | **Live demo** | https://assettrace.d2re85crrtyc3z.amplifyapp.com *(open on a phone; camera, video and GPS need HTTPS)* |
-| **Demo video (3 min)** | `<add link>` |
+| **Demo video (3 min)** | https://youtu.be/_fV54OxvKOc |
 | **Repository** | https://github.com/utk1college/AssetTrace |
 
 **Capture → Verify → Acknowledge → Lock → Return → Compare → Report**
