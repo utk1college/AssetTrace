@@ -26,7 +26,7 @@ export default function InspectionReviewPage() {
         inspectionService.listEvidence(id, "baseline"),
       ]);
       setInspection(nextInspection);
-      setEvidence(nextEvidence);
+      setEvidence(nextEvidence.filter((item) => item.mediaType !== "video"));
     } catch (loadError) {
       setError(loadError instanceof Error ? loadError.message : "Unable to load evidence review.");
     } finally {

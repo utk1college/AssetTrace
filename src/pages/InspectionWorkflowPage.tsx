@@ -5,6 +5,7 @@ import {
   Building2,
   House,
   RotateCcw,
+  Square,
 } from 'lucide-react'
 import type { LucideIcon } from 'lucide-react'
 import { useNavigate, useParams } from 'react-router-dom'
@@ -22,6 +23,7 @@ const ASSET_ICONS: Record<AssetType, LucideIcon> = {
   bike: Bike,
   apartment: Building2,
   house: House,
+  wall: Square,
 }
 
 const ASSET_LABELS: Record<AssetType, string> = {
@@ -29,6 +31,7 @@ const ASSET_LABELS: Record<AssetType, string> = {
   bike: 'Bike',
   apartment: 'Apartment',
   house: 'House',
+  wall: 'Wall',
 }
 
 export default function InspectionWorkflowPage() {

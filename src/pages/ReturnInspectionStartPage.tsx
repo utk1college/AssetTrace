@@ -33,7 +33,7 @@ export default function ReturnInspectionStartPage() {
         setIsFrozen(Boolean(inspection.returnCompletedAt));
         if (user?.id === inspection.ownerId) {
           setIsOwner(true);
-          setEvidence(await inspectionService.listEvidence(id, "return"));
+          setEvidence((await inspectionService.listEvidence(id, "return")).filter((item) => item.mediaType !== "video"));
         }
       })
       .catch(() => {

@@ -1,5 +1,5 @@
 ﻿import { useState } from 'react'
-import { ArrowRight, Bike, Building2, House } from 'lucide-react'
+import { ArrowRight, Bike, Building2, House, Square } from 'lucide-react'
 import { useNavigate } from 'react-router-dom'
 
 import PrimaryButton from '@/components/ui/PrimaryButton'
@@ -15,6 +15,7 @@ const ASSET_ICONS: Record<Inspection['assetType'], typeof Bike> = {
   bike: Bike,
   apartment: Building2,
   house: House,
+  wall: Square,
 }
 
 export default function JoinInspectionPage() {

@@ -132,7 +132,8 @@ function inspectionFromApi(value: ApiInspection): Inspection {
     assetType !== "scooter" &&
     assetType !== "bike" &&
     assetType !== "apartment" &&
-    assetType !== "house"
+    assetType !== "house" &&
+    assetType !== "wall"
   ) {
     throw new Error("Inspection response contains an unsupported asset type.");
   }

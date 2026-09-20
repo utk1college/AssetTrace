@@ -1,5 +1,5 @@
 ﻿import { useState } from 'react'
-import { ArrowRight, Bike, Building2, Check, Copy, House, Plus, Trash2 } from 'lucide-react'
+import { ArrowRight, Bike, Building2, Check, Copy, House, Plus, Square, Trash2 } from 'lucide-react'
 import { QRCodeSVG } from 'qrcode.react'
 import { useNavigate } from 'react-router-dom'
 
@@ -24,6 +24,7 @@ const ASSET_OPTIONS: {
   { value: 'bike', label: 'Bike', description: 'Keep every visible detail accountable.', icon: Bike },
   { value: 'apartment', label: 'Apartment', description: 'Record rooms as they change hands.', icon: Building2 },
   { value: 'house', label: 'House', description: 'Build a clear condition record.', icon: House },
+  { value: 'wall', label: 'Wall', description: 'Scan one surface for visible change.', icon: Square },
 ]
 
 const INSPECTION_OPTIONS: {
@@ -130,6 +131,8 @@ export default function CreateInspectionPage() {
                     <Building2 aria-hidden="true" />
                   ) : assetType === 'house' ? (
                     <House aria-hidden="true" />
+                  ) : assetType === 'wall' ? (
+                    <Square aria-hidden="true" />
                   ) : (
                     <Bike aria-hidden="true" />
                   )}

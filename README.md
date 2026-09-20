@@ -1,6 +1,24 @@
+The hosted build uses real mode. Open it on a phone over HTTPS to test camera, video, and geolocation permissions. The frontend is hosted by Amplify Hosting; the API uses Cognito, API Gateway, Lambda, DynamoDB, S3, and Bedrock.
+
+### Real mobile end-to-end test
+
+Use two phones if possible. A single phone can switch accounts, but two phones make the Owner/Renter handoff easier to observe. Both phones need internet access; they do not need to share Wi-Fi because the demo is hosted over HTTPS.
+1. Open the hosted URL on both phones: `https://assettrace.d2re85crrtyc3z.amplifyapp.com`.
+2. Create two separate Cognito accounts from **Create an account**. Use two real email inboxes because Cognito sends a confirmation code. Use a password with 8+ characters, uppercase, lowercase, number, and symbol.
+3. Sign in as the first user on Phone A. Choose **New inspection**, select **Wall**, name it something like `Living room wall`, choose **Owner**, and keep the default wall capture points or rename them to the exact surface sections you will test.
+4. Share the six-character session code shown after creation with the second user.
+5. On Phone A, open the inspection and choose **Record baseline condition**. Allow camera and location permissions. Capture every wall section, then record the guided context video by slowly scanning the full wall from left to right, including edges and visible marks. Stop the video or let the 15-second limit stop it, then continue to baseline review.
+6. On Phone B, sign in as the second user, choose **Join**, enter the six-character code, open the inspection, and review the baseline photos. The second user should acknowledge the baseline from the verification screen.
+7. On Phone A, acknowledge the same baseline. Once both acknowledgements appear, lock the baseline. Confirm the UI shows that the baseline is read-only.
+8. Before return capture, place a clearly visible object or mark on the wall without changing the baseline. On Phone B, open the locked inspection and choose **Record return condition**. Capture the same wall sections and record a second guided context video showing the changed wall.
+9. On Phone A, open the return review, confirm the return evidence is present, then open **Compare evidence**. The owner runs the comparison. This is the step that invokes Bedrock and may incur a charge.
+10. Open the **Condition report**. Confirm it contains before and after photos, both playable context videos, phase, timestamp, GPS availability, SHA-256, capturer, acknowledgement count, baseline lock time, comparison status, confidence, and explanation.
+11. Open **Reports** from the bottom navigation and confirm the inspection is listed. After all return photos and the return context video are saved, the transaction should show as frozen and further return uploads should be blocked.
+
+For a clean repeat, use a new inspection and different account pair. Do not use the same baseline after locking; locked evidence is intentionally immutable.
 # AssetTrace
 
-AssetTrace creates a shared, evidence-led condition record when a rental asset changes hands, then compares the move-in baseline with the return condition. The MVP supports scooters, bikes, apartments, and houses.
+AssetTrace creates a shared, evidence-led condition record when a rental asset changes hands, then compares the move-in baseline with the return condition. The MVP supports scooters, bikes, apartments, houses, and walls/surfaces.
 
 **Capture → Verify → Acknowledge → Lock → Return → Compare → Report**
 
@@ -80,7 +98,25 @@ The deployed API is:
 https://5v3g0fkokj.execute-api.us-east-1.amazonaws.com/prod
 ```
 
-The hosted build uses real mode. Open it on a phone over HTTPS to test camera and geolocation permissions. The frontend is hosted by Amplify Hosting; the API uses Cognito, API Gateway, Lambda, DynamoDB, S3, and Bedrock.
+The hosted build uses real mode. Open it on a phone over HTTPS to test camera, video, and geolocation permissions. The frontend is hosted by Amplify Hosting; the API uses Cognito, API Gateway, Lambda, DynamoDB, S3, and Bedrock.
+
+### Real mobile end-to-end test
+
+Use two phones if possible. A single phone can switch accounts, but two phones make the Owner/Renter handoff easier to observe. Both phones need internet access; they do not need to share Wi-Fi because the demo is hosted over HTTPS.
+
+1. Open `https://assettrace.d2re85crrtyc3z.amplifyapp.com` on both phones.
+2. Create two separate Cognito accounts from **Create an account**. Use two real email inboxes because Cognito sends a confirmation code. Use a password with 8+ characters, uppercase, lowercase, number, and symbol.
+3. Sign in as the first user on Phone A. Choose **New inspection**, select **Wall**, name it `Living room wall`, choose **Owner**, and keep or rename the default wall capture points.
+4. Share the six-character session code shown after creation with the second user.
+5. On Phone A, choose **Record baseline condition**. Allow camera and location permissions. Capture every wall section, then record the guided context video by slowly scanning the full wall from left to right, including edges and visible marks.
+6. On Phone B, sign in as the second user, choose **Join**, enter the code, open the inspection, review the baseline photos, and acknowledge the baseline.
+7. On Phone A, acknowledge the same baseline. Once both acknowledgements appear, lock the baseline and confirm it is read-only.
+8. Place a clearly visible object or mark on the wall without changing the baseline. On Phone B, open the locked inspection, choose **Record return condition**, capture the same wall sections, and record the second guided context video showing the changed wall.
+9. On Phone A, open **Compare evidence**. The owner runs the comparison. This invokes Bedrock and may incur a charge.
+10. Open **Condition report**. Confirm before/after photos, both playable context videos, phase, timestamp, GPS availability, SHA-256, capturer, acknowledgement count, lock time, comparison status, confidence, and explanation.
+11. Open **Reports** from the bottom navigation. After all return photos and the return context video are saved, the transaction should show as frozen and further return uploads should be blocked.
+
+For a clean repeat, use a new inspection and account pair. Do not try to change baseline evidence after locking; immutability is intentional.
 
 ## Product and technical scope
 
@@ -95,7 +131,7 @@ The following features are implemented in the current frontend and backend. Stat
 | Sign-in and session restoration | Logs users in, stores the session through the selected auth adapter, restores the current user on app load, and supports sign-out. |
 | Protected navigation | Dashboard, inspections, capture, review, comparison, reports, and profile require authentication. Login and registration are public-only routes. |
 | Profile page | Shows the signed-in user’s name and email, with an explicit sign-out action. |
-| Inspection creation | Creates a session for a scooter, bike, apartment, or house, with a custom asset name and move-in or move-out type. |
+| Inspection creation | Creates a session for a scooter, bike, apartment, house, or wall/surface, with a custom asset name and move-in or move-out type. |
 | Role selection | The creator chooses Owner or Renter for the session. The second participant receives the opposite session role when joining. |
 | Custom capture points | The creator can edit, add, and remove photo titles. Those stable titles become the required return-capture points. |
 | Session sharing | Generates a six-character session code and QR code. The code can be copied and shared with the other participant. |
@@ -103,7 +139,7 @@ The following features are implemented in the current frontend and backend. Stat
 | Inspection dashboard | Lists inspections visible to the signed-in user, shows asset type, participant role, progress, session stage, and lock/frozen status. |
 | Persistent mobile navigation | Provides Home, New inspection, Join, and Reports destinations throughout authenticated screens. |
 | Camera capture | Requests the device camera, prefers the rear-facing camera, displays a live preview, captures JPEG evidence, and supports camera-permission retry. |
-| Guided context video | Captures one short, phase-specific video after the photo sequence at handover/baseline and return. Directions are asset-aware: bikes scan sides and frame; properties scan relevant rooms/surfaces. Videos are stored with duration, timestamp, phase, GPS availability, SHA-256, and capturer identity. Video is not sent to Bedrock. |
+| Guided context video | Captures one short, phase-specific video after the photo sequence at handover/baseline and return. Directions are asset-aware: bikes scan sides and frame; walls scan the full surface and edges; properties scan relevant rooms/surfaces. Videos are stored with duration, timestamp, phase, GPS availability, SHA-256, and capturer identity. Video is not sent to Bedrock. |
 | Evidence metadata | Records capture time, optional geolocation, SHA-256 media digest, phase, capture point, content type, and suspicious flag. Current capture flow sets `suspicious` to `false`. |
 | Evidence upload | Real mode requests a short-lived presigned S3 URL, uploads the image directly to S3, then saves metadata through the API. Mock mode uses local object URLs and local storage. |
 | Capture retry | Keeps a failed capture in the current screen and offers a retry for the metadata/upload operation. |
@@ -121,7 +157,7 @@ The following features are implemented in the current frontend and backend. Stat
 | Toast feedback | Shows transient success or error feedback for copying a session code, acknowledging, and locking a baseline. |
 | Loading, empty, and error states | Asynchronous screens provide loading indicators, empty states, retry actions, permission messages, and recoverable error messages where implemented. |
 
-Supported asset types are scooters, bikes, apartments, and houses. Cars and other asset types are not currently supported.
+Supported asset types are scooters, bikes, apartments, houses, and walls/surfaces. Cars and other asset types are not currently supported.
 
 ### Current user flow
 
@@ -132,7 +168,7 @@ Supported asset types are scooters, bikes, apartments, and houses. Cars and othe
 5. Both participants review and acknowledge the baseline.
 6. The baseline is locked and becomes read-only.
 7. The renter captures the same configured points for the return condition.
-8. When all return points are complete, the transaction is frozen against further return evidence changes.
+8. When all return points and the return context video are complete, the transaction is frozen against further return evidence changes.
 9. The owner runs the comparison, reviews the results, and opens the condition report.
 
 The product reports evidence signals and model observations. It does not claim guaranteed authenticity, legal validity, perfect spoof prevention, or automatic legal damage determination.

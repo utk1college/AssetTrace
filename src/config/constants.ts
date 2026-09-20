@@ -41,4 +41,12 @@ export const INSPECTION_AREAS = {
     'Staircase',
     'Outdoor area',
   ],
+
+  wall: [
+    'Full surface',
+    'Left section',
+    'Center section',
+    'Right section',
+    'Lower edge',
+  ],
 } as const

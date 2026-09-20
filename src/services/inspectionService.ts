@@ -5,7 +5,7 @@ export type Role = "owner" | "renter";
 
 export type SessionRole = Role;
 
-export type AssetType = "scooter" | "bike" | "apartment" | "house";
+export type AssetType = "scooter" | "bike" | "apartment" | "house" | "wall";
 
 export type InspectionType = "move-in" | "move-out" | "handover";
 

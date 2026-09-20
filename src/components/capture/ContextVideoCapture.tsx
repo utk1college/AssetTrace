@@ -8,6 +8,7 @@ const DIRECTIONS: Record<AssetType, string> = {
   bike: "Slowly pan around the front, both sides, rear, handlebars, and frame.",
   apartment: "Slowly scan the entrance, living space, kitchen, bedroom, bathroom, and balcony.",
   house: "Slowly scan the entrance, living spaces, kitchen, bedrooms, bathrooms, stairs, and outdoor area.",
+  wall: "Slowly scan the full wall from left to right, including the lower edge and any visible marks or fixtures.",
 };
 
 export default function ContextVideoCapture({ assetType, onRecorded, isSaving = false }: { assetType: AssetType; onRecorded: (file: Blob, durationSeconds: number) => void; isSaving?: boolean }) {

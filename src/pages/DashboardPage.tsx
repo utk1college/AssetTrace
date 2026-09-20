@@ -6,6 +6,7 @@ import {
   ChevronRight,
   House,
   Plus,
+  Square,
 } from 'lucide-react'
 import type { LucideIcon } from 'lucide-react'
 
@@ -24,12 +25,14 @@ const ASSET_ICONS: Record<AssetType, LucideIcon> = {
   bike: Bike,
   apartment: Building2,
   house: House,
+  wall: Square,
 }
 const ASSET_LABELS: Record<AssetType, string> = {
   scooter: 'Scooter',
   bike: 'Bike',
   apartment: 'Apartment',
   house: 'House',
+  wall: 'Wall',
 }
 
 export default function DashboardPage() {
