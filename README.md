@@ -1,4 +1,4 @@
-# AssetTrace
+# AssetTrace: a shared, locked record of condition for every handover
 
 **"It was already like that." Not anymore. AssetTrace locks in the condition of anything you hand over, then shows you exactly what changed when it comes back.**
 
@@ -8,6 +8,7 @@ Built by **Team Pandoras Box** for **First Commit** (WeMakeDevs × AWS, Bharat B
 |---|---|
 | **Live demo** | https://assettrace.d2re85crrtyc3z.amplifyapp.com *(open on a phone; camera, video and GPS need HTTPS)* |
 | **Demo video (3 min)** | https://youtu.be/_fV54OxvKOc |
+| **Blog post** | https://builder.aws.com/content/3JauI08DzeMmEtFAvEJVmmkl8mO/ending-it-was-already-like-that-how-we-built-assettrace-on-aws |
 | **Repository** | https://github.com/utk1college/AssetTrace |
 
 **Capture → Verify → Acknowledge → Lock → Return → Compare → Report**
