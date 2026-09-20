@@ -291,8 +291,11 @@ export async function requestEvidenceUploadUrl(
   if (request.phase === "return" && inspection.status !== "locked") {
     throw new Error("The baseline must be locked before return evidence can be uploaded.");
   }
+  if (request.phase === "return" && inspection.returnCompletedAt) {
+    throw new Error("This transaction is complete. Return evidence is read-only.");
+  }
 
-  if (!request.contentType.startsWith("image/")) {
+  if (!request.contentType.startsWith("image/") && !request.contentType.startsWith("video/")) {
     throw new Error("Only image evidence is supported.");
   }
 
@@ -329,6 +332,9 @@ export async function saveEvidence(
   if (request.phase === "return" && inspection.status !== "locked") {
     throw new Error("The baseline must be locked before return evidence can be saved.");
   }
+  if (request.phase === "return" && inspection.returnCompletedAt) {
+    throw new Error("This transaction is complete. Return evidence is read-only.");
+  }
 
   if (!request.evidenceId) {
     throw new Error("Evidence ID is required.");
@@ -349,6 +355,10 @@ export async function saveEvidence(
     location: request.location,
     suspicious: request.suspicious,
     viewUrl: evidenceViewUrls.get(request.evidenceId),
+    mediaType: request.mediaType ?? "photo",
+    durationSeconds: request.durationSeconds,
+    contentType: request.mediaType === "video" ? "video/webm" : "image/jpeg",
+    capturedBy: currentUser?.id,
   };
 
   const allEvidence = readEvidence();
@@ -368,6 +378,19 @@ export async function saveEvidence(
         ],
       };
       writeInspections(inspections);
+    }
+  }
+
+  if (request.phase === "return" && request.mediaType === "video") {
+    const returnEvidence = allEvidence.filter((item) => item.inspectionId === inspectionId && item.phase === "return");
+    const capturedIds = new Set(returnEvidence.filter((item) => item.mediaType !== "video").map((item) => item.areaId));
+    if (inspection.capturePoints.every((point) => capturedIds.has(point.id))) {
+      const inspections = readInspections();
+      const inspectionIndex = inspections.findIndex((item) => item.id === inspectionId);
+      if (inspectionIndex !== -1) {
+        inspections[inspectionIndex] = { ...inspections[inspectionIndex], returnCompletedAt: new Date().toISOString() };
+        writeInspections(inspections);
+      }
     }
   }
 
@@ -398,7 +421,7 @@ export async function uploadEvidence(
     throw new Error("Evidence file is empty.");
   }
 
-  if (!contentType.startsWith("image/")) {
+  if (!contentType.startsWith("image/") && !contentType.startsWith("video/")) {
     throw new Error("Only image evidence is supported.");
   }
 

@@ -64,10 +64,6 @@ useEffect(() => {
 }, [loadInspections])
 
   const visibleInspections = [...inspections]
-  const lockedInspections = visibleInspections.filter(
-    (inspection) => inspection.status === 'locked',
-  )
-
   if (
     currentInspection &&
     !visibleInspections.some(
@@ -81,8 +77,9 @@ useEffect(() => {
     <div className="min-h-screen bg-[var(--surface)] pb-24">
       <div className="container py-6">
         <header className="mb-7">
-          <p className="text-small mb-1">Inspection overview</p>
+          <p className="text-small mb-1">Evidence-led handovers</p>
           <h1 className="text-display">Your inspections</h1>
+          <p className="text-body mt-2">Secure the starting condition, compare the return, and keep one clear record.</p>
         </header>
 
         <Link
@@ -149,33 +146,6 @@ useEffect(() => {
           )}
         </section>
 
-        <section id="reports" aria-labelledby="reports-heading">
-          <h2 id="reports-heading" className="section-label mb-3">
-            REPORTS
-          </h2>
-          {lockedInspections.length === 0 ? (
-            <p className="text-small">Locked inspections will appear here.</p>
-          ) : (
-            <div className="space-y-3">
-              {lockedInspections.map((inspection) => (
-                <Link
-                  key={inspection.id}
-                  to={`/inspections/${inspection.id}/report`}
-                  className="block card-interactive p-4 no-underline"
-                >
-                  <div className="flex items-center justify-between gap-3">
-                    <div>
-                      <p className="text-subheading">{inspection.assetName}</p>
-                      <p className="text-small mt-1">Condition report</p>
-                    </div>
-                    <ChevronRight className="h-5 w-5 shrink-0" aria-hidden="true" />
-                  </div>
-                </Link>
-              ))}
-            </div>
-          )}
-        </section>
-
       </div>
     </div>
   )
@@ -203,9 +173,16 @@ function InspectionCard({
 
   const status = getStatusDisplay(inspection.status)
 
-    const participant = userId === inspection.ownerId
-      ? `Owner${inspection.renterId ? ' · Renter joined' : ' · Awaiting renter'}`
-      : `Renter${inspection.ownerId ? ' · Owner joined' : ' · Awaiting owner'}`
+      const participant = userId === inspection.ownerId
+        ? `Owner: You · ${inspection.renterId ? 'Renter joined' : 'Renter pending'}`
+        : `Renter: You · ${inspection.ownerId ? 'Owner joined' : 'Owner pending'}`
+      const stage = inspection.returnCompletedAt
+        ? 'Transaction frozen'
+        : inspection.status === 'locked'
+          ? 'Baseline secured · Return stage'
+          : inspection.status === 'awaiting-confirmation'
+            ? 'Awaiting both confirmations'
+            : 'Baseline capture stage'
 
   return (
     <Link
@@ -232,6 +209,7 @@ function InspectionCard({
           <p className="text-small truncate">
             {ASSET_LABELS[inspection.assetType]} · {participant}
           </p>
+          <p className="text-small mt-1 font-medium text-[var(--text-primary)]">{stage}</p>
         </div>
       </div>
 

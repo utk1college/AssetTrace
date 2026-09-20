@@ -1,6 +1,7 @@
 ﻿import { useEffect, useState } from "react";
 import { useLocation, useNavigate, useParams } from "react-router-dom";
 import CameraCapture from "@/components/capture/CameraCapture";
+import ContextVideoCapture from "@/components/capture/ContextVideoCapture";
 import inspectionService, { type CapturePoint } from "@/services/inspectionService";
 import { getCurrentLocation, sha256Blob } from "@/utils/captureEvidence";
 
@@ -21,6 +22,9 @@ export default function CaptureScreen() {
   const [isComplete, setIsComplete] = useState(false);
   const [pendingFile, setPendingFile] = useState<Blob | null>(null);
   const [locationRecorded, setLocationRecorded] = useState(false);
+  const [assetType, setAssetType] = useState<"scooter" | "bike" | "apartment" | "house">("bike");
+  const [videoSaved, setVideoSaved] = useState(false);
+  const [isVideoSaving, setIsVideoSaving] = useState(false);
 
   useEffect(() => {
     const timer = window.setTimeout(() => {
@@ -56,6 +60,7 @@ export default function CaptureScreen() {
           setCapturePoints(inspection.capturePoints.length
             ? [...inspection.capturePoints].sort((left, right) => left.order - right.order)
             : inspection.areas.map((title, order) => ({ id: `area-${order + 1}`, title, order })));
+          setAssetType(inspection.assetType);
         })
         .catch(() => {
           setError("Unable to load the inspection. Please try again.");
@@ -135,22 +140,26 @@ export default function CaptureScreen() {
     setPendingFile(file);
     await saveEvidence(file);
   }
+  async function saveContextVideo(file: Blob, durationSeconds: number) {
+    if (!id) return;
+    setIsVideoSaving(true);
+    setError(null);
+    try {
+      const [sha256, location] = await Promise.all([sha256Blob(file), getCurrentLocation()]);
+      const upload = await inspectionService.requestEvidenceUploadUrl(id, { areaId: "context-video", capturePointId: "context-video", contentType: file.type, phase, mediaType: "video" });
+      await inspectionService.uploadEvidence(upload.uploadUrl, file, file.type);
+      await inspectionService.saveEvidence(id, { evidenceId: upload.evidenceId, areaId: "context-video", capturePointId: "context-video", capturePointTitle: "Context video", phase, key: upload.key, sha256, capturedAt: new Date().toISOString(), location, suspicious: false, mediaType: "video", durationSeconds });
+      setVideoSaved(true);
+    } catch {
+      setError("Unable to save the context video. Please try again.");
+    } finally {
+      setIsVideoSaving(false);
+    }
+  }
   if (isComplete) {
     return (
       <main className="container py-6">
-        <h1 className="text-xl font-semibold text-[var(--text)]">
-          Capture complete
-        </h1>
-        <p className="mt-2 text-sm text-[var(--text-secondary)]">
-          Evidence recorded for all areas.
-        </p>
-        <button
-          type="button"
-          className="btn btn-primary mt-5 w-full"
-          onClick={() => navigate(phase === "return" ? `/inspections/${id}/compare` : `/inspections/${id}/review`)}
-        >
-          {phase === "return" ? "Review comparison" : "Review baseline"}
-        </button>
+        {!videoSaved ? <><h1 className="text-xl font-semibold text-[var(--text)]">Photos complete</h1><p className="mt-2 text-sm text-[var(--text-secondary)]">Add one short context video before continuing.</p>{error && <p className="mt-3 text-sm text-[var(--error)]" role="alert">{error}</p>}<div className="mt-5"><ContextVideoCapture assetType={assetType} onRecorded={saveContextVideo} isSaving={isVideoSaving} /></div></> : <><h1 className="text-xl font-semibold text-[var(--text)]">Capture complete</h1><p className="mt-2 text-sm text-[var(--text-secondary)]">Photos and context video recorded for the {phase} phase.</p><button type="button" className="btn btn-primary mt-5 w-full" onClick={() => navigate(phase === "return" ? `/inspections/${id}/compare` : `/inspections/${id}/review`)}>{phase === "return" ? "Review comparison" : "Review baseline"}</button></>}
       </main>
     );
   }

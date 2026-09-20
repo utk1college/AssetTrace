@@ -21,6 +21,7 @@ export interface EvidenceUploadRequest {
   capturePointId?: string;
   contentType: string;
   phase?: EvidencePhase;
+  mediaType?: "photo" | "video";
 }
 
 export interface EvidenceUploadResponse {
@@ -44,6 +45,8 @@ export interface SaveEvidenceRequest {
     accuracy: number;
   };
   suspicious: boolean;
+  mediaType?: "photo" | "video";
+  durationSeconds?: number;
 }
 
 export interface EvidenceMetadata {
@@ -63,6 +66,10 @@ export interface EvidenceMetadata {
   };
   suspicious: boolean;
   viewUrl?: string;
+  mediaType?: "photo" | "video";
+  durationSeconds?: number;
+  capturedBy?: string;
+  contentType?: string;
 }
 
 export type ComparisonStatus =
@@ -103,6 +110,7 @@ export interface Inspection {
   createdAt: string;
   acknowledgements?: Record<string, string>
   lockedAt?: string
+  returnCompletedAt?: string
 }
 
 export interface CapturePoint {

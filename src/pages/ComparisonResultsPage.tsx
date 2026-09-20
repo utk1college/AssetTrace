@@ -30,8 +30,8 @@ export default function ComparisonResultsPage() {
         inspectionService.getLatestComparison(id),
       ]);
       setInspection(nextInspection);
-      setBaseline(nextBaseline);
-      setReturned(nextReturn);
+      setBaseline(nextBaseline.filter((item) => item.mediaType !== "video"));
+      setReturned(nextReturn.filter((item) => item.mediaType !== "video"));
       setComparison(latest);
     } catch (loadError) {
       setError(loadError instanceof Error ? loadError.message : "Unable to load comparison data.");

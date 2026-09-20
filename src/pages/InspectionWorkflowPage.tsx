@@ -141,6 +141,18 @@ export default function InspectionWorkflowPage() {
             </div>
           </section>
 
+          <section className="card p-4" aria-labelledby="participants-heading">
+            <div className="flex items-center justify-between gap-3">
+              <h2 id="participants-heading" className="text-subheading">People and stage</h2>
+              <span className={getStatusBadgeClass(inspection.status)}>{getStatusLabel(inspection.status)}</span>
+            </div>
+            <div className="mt-4 grid gap-3 sm:grid-cols-2">
+              <Participant label="Owner" value={inspection.ownerId === user?.id ? 'You' : inspection.ownerId ? 'Owner joined' : 'Waiting for owner'} />
+              <Participant label="Renter" value={inspection.renterId === user?.id ? 'You' : inspection.renterId ? 'Renter joined' : 'Waiting for renter'} />
+            </div>
+            <p className="text-small mt-4">{getStageDescription(inspection)}</p>
+          </section>
+
           <section aria-labelledby="progress-heading">
             <div className="mb-3">
               <h2
@@ -203,8 +215,9 @@ export default function InspectionWorkflowPage() {
               fullWidth
               type="button"
               onClick={() => navigate(nextAction.path)}
+              disabled={Boolean(inspection.returnCompletedAt)}
             >
-              {nextAction.label}
+              {inspection.returnCompletedAt ? 'Transaction complete' : nextAction.label}
               <ArrowRight
                 className="h-5 w-5"
                 aria-hidden="true"
@@ -344,4 +357,15 @@ function WorkflowError({
       </div>
     </div>
   )
+}
+
+function Participant({ label, value }: { label: string; value: string }) {
+  return <div className="rounded-lg bg-[var(--surface-subtle)] p-3"><p className="text-tiny">{label}</p><p className="text-body mt-1 font-medium">{value}</p></div>
+}
+
+function getStageDescription(inspection: Inspection) {
+  if (inspection.returnCompletedAt) return 'Both baseline and return evidence are complete. This transaction is frozen; no more photos or edits can be added.'
+  if (inspection.status === 'locked') return 'The baseline is secured. The renter can now capture the return condition.'
+  if (inspection.status === 'awaiting-confirmation') return 'Both parties must review and acknowledge before the baseline can be secured.'
+  return 'The owner is recording the baseline condition before the renter joins and reviews it.'
 }

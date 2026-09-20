@@ -12,16 +12,18 @@ import type {
   SessionRole,
 } from '@/services/inspectionService'
 import { INSPECTION_AREAS } from '@/config/constants'
+import { useToast } from '@/components/feedback/useToast'
 
 const ASSET_OPTIONS: {
   value: AssetType
   label: string
+  description: string
   icon: typeof Bike
 }[] = [
-  { value: 'scooter', label: 'Scooter', icon: Bike },
-  { value: 'bike', label: 'Bike', icon: Bike },
-  { value: 'apartment', label: 'Apartment', icon: Building2 },
-  { value: 'house', label: 'House', icon: House },
+  { value: 'scooter', label: 'Scooter', description: 'Capture the ride before handover.', icon: Bike },
+  { value: 'bike', label: 'Bike', description: 'Keep every visible detail accountable.', icon: Bike },
+  { value: 'apartment', label: 'Apartment', description: 'Record rooms as they change hands.', icon: Building2 },
+  { value: 'house', label: 'House', description: 'Build a clear condition record.', icon: House },
 ]
 
 const INSPECTION_OPTIONS: {
@@ -43,6 +45,7 @@ const INSPECTION_OPTIONS: {
 
 export default function CreateInspectionPage() {
   const navigate = useNavigate()
+  const { showToast } = useToast()
 
   const createInspection = useInspectionStore(
     (state) => state.createInspection,
@@ -100,6 +103,7 @@ export default function CreateInspectionPage() {
     try {
       await navigator.clipboard.writeText(createdInspection.sessionCode)
       setCopied(true)
+      showToast('Inspection code copied. Share it with the other party.')
 
       window.setTimeout(() => {
         setCopied(false)
@@ -251,6 +255,7 @@ export default function CreateInspectionPage() {
                         {option.label}
                       </span>
                     </span>
+                    <span className="text-small mt-2 block">{option.description}</span>
                   </button>
                 )
               })}

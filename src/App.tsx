@@ -26,6 +26,9 @@ import ReturnInspectionStartPage from "@/pages/ReturnInspectionStartPage";
 import ComparisonResultsPage from "@/pages/ComparisonResultsPage";
 import ComparisonDetailPage from "@/pages/ComparisonDetailPage";
 import ReportPage from "@/pages/ReportPage";
+import ProfilePage from "@/pages/ProfilePage";
+import ReportsPage from "@/pages/ReportsPage";
+import { ToastProvider } from "@/components/feedback/ToastProvider";
 
 export default function App() {
   const hydrate = useAuthStore((state) => state.hydrate);
@@ -35,6 +38,7 @@ export default function App() {
   }, [hydrate]);
 
   return (
+    <ToastProvider>
     <BrowserRouter>
       <Routes>
         {/* Auth */}
@@ -59,6 +63,8 @@ export default function App() {
         <Route element={<AuthenticatedLayout />}>
           {/* Dashboard */}
           <Route path="/dashboard" element={<DashboardPage />} />
+          <Route path="/profile" element={<ProfilePage />} />
+          <Route path="/reports" element={<ReportsPage />} />
 
           {/* Inspection creation & joining */}
           <Route path="/inspections/new" element={<CreateInspectionPage />} />
@@ -105,6 +111,7 @@ export default function App() {
         </Route>
       </Routes>
     </BrowserRouter>
+    </ToastProvider>
   );
 }
 

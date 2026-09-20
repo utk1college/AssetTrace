@@ -1,15 +1,10 @@
-import { Link, useNavigate } from 'react-router-dom'
+import { Link, useLocation } from 'react-router-dom'
 import { UserRound } from 'lucide-react'
 import { useAuthStore } from '@/store/authStore'
 
 export default function TopNav() {
-  const navigate = useNavigate()
-  const { user, signOut, isLoading } = useAuthStore()
-
-  async function handleSignOut() {
-    await signOut()
-    navigate('/login', { replace: true })
-  }
+  const location = useLocation()
+  const user = useAuthStore((state) => state.user)
 
   return (
     <header className="sticky top-0 z-50 w-full border-b border-[var(--border)] bg-[var(--background)]">
@@ -29,10 +24,10 @@ export default function TopNav() {
           </Link>
           
           {/* Right side nav */}
-          {user && <button type="button" onClick={handleSignOut} disabled={isLoading} className="flex min-h-12 items-center gap-2 rounded-lg px-2 text-[var(--text-secondary)] hover:bg-[var(--surface-subtle)]" aria-label={`Sign out ${user.name}`}>
+          {user && <Link to="/profile" className={`flex min-h-12 items-center gap-2 rounded-lg px-2 no-underline ${location.pathname === '/profile' ? 'text-[var(--accent)]' : 'text-[var(--text-secondary)]'} hover:bg-[var(--surface-subtle)]`} aria-label="Open profile">
             <UserRound className="h-5 w-5" aria-hidden="true" />
-            <span className="hidden text-small sm:inline">Sign out</span>
-          </button>}
+            <span className="hidden text-small sm:inline">Account</span>
+          </Link>}
         </div>
       </div>
     </header>

@@ -3,9 +3,8 @@ import { Link, useLocation } from 'react-router-dom'
 import type { LucideIcon } from 'lucide-react'
 
 export default function BottomNav() {
-  const { pathname, hash } = useLocation()
-  if (pathname !== '/dashboard') return null
-  return <nav aria-label="Primary navigation" className="fixed inset-x-0 bottom-0 z-50 border-t border-[var(--border)] bg-white safe-bottom"><div className="container flex h-16 items-center justify-around"><NavItem to="/dashboard" icon={Home} label="Home" active={pathname === '/dashboard' && !hash} /><NavItem to="/inspections/new" icon={PlusCircle} label="New inspection" /><NavItem to="/inspections/join" icon={ClipboardList} label="Join" /><NavItem to="/dashboard#reports" icon={FileText} label="Reports" active={pathname === '/dashboard' && hash === '#reports'} /></div></nav>
+  const { pathname } = useLocation()
+  return <nav aria-label="Primary navigation" className="fixed inset-x-0 bottom-0 z-50 border-t border-[var(--border)] bg-white safe-bottom"><div className="container flex h-16 items-center justify-around"><NavItem to="/dashboard" icon={Home} label="Home" active={pathname === '/dashboard'} /><NavItem to="/inspections/new" icon={PlusCircle} label="New inspection" active={pathname === '/inspections/new'} /><NavItem to="/inspections/join" icon={ClipboardList} label="Join" active={pathname === '/inspections/join'} /><NavItem to="/reports" icon={FileText} label="Reports" active={pathname === '/reports'} /></div></nav>
 }
 
 function NavItem({ to, icon: Icon, label, active = false }: { to: string; icon: LucideIcon; label: string; active?: boolean }) {

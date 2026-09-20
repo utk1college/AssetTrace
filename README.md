@@ -6,9 +6,9 @@ AssetTrace creates a shared, evidence-led condition record when a rental asset c
 
 ## Start here
 
-1. Read [DESIGN.md](DESIGN.md) before changing UI. It is the single visual and interaction source of truth.
-2. Read [TEAM_PLAN.md](TEAM_PLAN.md) for ownership, branch rules, API contracts, and handover criteria.
-3. Use mock mode for isolated UI work. Real mode is available for the deployed integration described in `Utkrisht.md` and `TEAM_PLAN.md`.
+1. Use mock mode for isolated UI work and local development.
+2. Use the hosted demo for phone testing and real integration checks.
+3. Keep this README as the source of truth for product behavior, design rules, deployment details, and limitations.
 
 ## Run locally
 
@@ -38,7 +38,7 @@ git commit -m "Describe the feature"
 git push -u origin feat/your-feature-name
 ```
 
-Open a pull request against `main`. Include the relevant handover note (`A.md`, `S.md`, or `Sh.md`) and explain how the feature was tested. Never commit `.env.local`, AWS credentials, or secrets.
+Open a pull request against `main`. Explain how the feature was tested. Never commit `.env.local`, AWS credentials, or secrets.
 
 After setup, run:
 
@@ -66,38 +66,76 @@ Real mode requires the deployed API URL and a confirmed browser session. The che
 
 `.env.example` contains the shared non-secret identifiers. Never commit credentials, local access keys, or a populated `.env.local`.
 
+## Hosted demo
+
+The current AWS-hosted frontend is available at:
+
+```text
+https://assettrace.d2re85crrtyc3z.amplifyapp.com
+```
+
+The deployed API is:
+
+```text
+https://5v3g0fkokj.execute-api.us-east-1.amazonaws.com/prod
+```
+
+The hosted build uses real mode. Open it on a phone over HTTPS to test camera and geolocation permissions. The frontend is hosted by Amplify Hosting; the API uses Cognito, API Gateway, Lambda, DynamoDB, S3, and Bedrock.
+
 ## Product and technical scope
 
-### Planned MVP features
+### Implemented product features
 
-The two-day MVP is planned as these decoupled product capabilities. A feature being listed here is a target, not a claim that it is already implemented; see the current-status section at the end of this README.
+The following features are implemented in the current frontend and backend. Statuses and limitations are documented below rather than inferred from the product plan.
 
-| Capability | Planned outcome |
+| Feature | What it does |
 |---|---|
-| Authentication | Owner and renter accounts, role-aware access, and protected inspection sessions |
-| Inspection sessions | Create move-in/move-out inspections, use area checklists, and let a second party join by QR or session code |
-| Guided evidence capture | Live camera-only capture with a step-by-step asset workflow, timestamps, location, and available device telemetry |
-| Capture verification | Flag suspicious capture signals such as screen recapture, failed movement challenge, or missing continuity; never claim proof of authenticity |
-| Evidence integrity | SHA-256 media hashes, inspection-level integrity metadata, acknowledgement records, and an immutable locked baseline |
-| Joint verification | Both parties review, acknowledge, and lock a condition baseline together |
-| Secure storage | Preserve original evidence and inspection metadata, separating move-in and return records |
-| Return inspection | Repeat the same guided inspection flow at return |
-| AI comparison | Compare before/after evidence, localise visible changes, classify likely damage, and clearly surface uncertain results for review |
-| Condition reports | Present existing versus newly observed damage, evidence, verification metadata, and a downloadable/shareable report |
+| Account registration | Creates an account with name, email, and password. Real mode uses Cognito; mock mode stores test accounts locally. |
+| Email confirmation | Real mode supports Cognito confirmation codes and handles unconfirmed accounts during sign-in. Mock mode accepts a non-empty code. |
+| Sign-in and session restoration | Logs users in, stores the session through the selected auth adapter, restores the current user on app load, and supports sign-out. |
+| Protected navigation | Dashboard, inspections, capture, review, comparison, reports, and profile require authentication. Login and registration are public-only routes. |
+| Profile page | Shows the signed-in user’s name and email, with an explicit sign-out action. |
+| Inspection creation | Creates a session for a scooter, bike, apartment, or house, with a custom asset name and move-in or move-out type. |
+| Role selection | The creator chooses Owner or Renter for the session. The second participant receives the opposite session role when joining. |
+| Custom capture points | The creator can edit, add, and remove photo titles. Those stable titles become the required return-capture points. |
+| Session sharing | Generates a six-character session code and QR code. The code can be copied and shared with the other participant. |
+| Session joining | Validates the six-character code for the active mode, finds the inspection, and prevents a participant from joining their own session. |
+| Inspection dashboard | Lists inspections visible to the signed-in user, shows asset type, participant role, progress, session stage, and lock/frozen status. |
+| Persistent mobile navigation | Provides Home, New inspection, Join, and Reports destinations throughout authenticated screens. |
+| Camera capture | Requests the device camera, prefers the rear-facing camera, displays a live preview, captures JPEG evidence, and supports camera-permission retry. |
+| Guided context video | Captures one short, phase-specific video after the photo sequence at handover/baseline and return. Directions are asset-aware: bikes scan sides and frame; properties scan relevant rooms/surfaces. Videos are stored with duration, timestamp, phase, GPS availability, SHA-256, and capturer identity. Video is not sent to Bedrock. |
+| Evidence metadata | Records capture time, optional geolocation, SHA-256 media digest, phase, capture point, content type, and suspicious flag. Current capture flow sets `suspicious` to `false`. |
+| Evidence upload | Real mode requests a short-lived presigned S3 URL, uploads the image directly to S3, then saves metadata through the API. Mock mode uses local object URLs and local storage. |
+| Capture retry | Keeps a failed capture in the current screen and offers a retry for the metadata/upload operation. |
+| Baseline review | Participants can review signed image URLs for baseline evidence and see capture progress. The renter has a placeholder objection action that currently displays an alert and does not create a backend objection record. |
+| Joint acknowledgement | Each participant records an acknowledgement. The baseline cannot be locked until all required baseline areas are captured and both parties acknowledge. |
+| Baseline lock | Locks the baseline and prevents further baseline evidence changes. The lock timestamp and acknowledgement records are persisted. |
+| Return inspection | After baseline lock, only the renter can capture return evidence. The owner can review submitted return evidence. |
+| Return transaction freeze | When all configured return capture points are saved, the inspection records `returnCompletedAt` and rejects further return evidence uploads. The UI presents the transaction as complete and read-only. |
+| Evidence comparison | Mock mode produces a deterministic review result. Real mode sends baseline and return image bytes to Amazon Nova 2 Lite through Bedrock. |
+| Comparison classifications | Results can be `Existing`, `New`, `Uncertain`, or `No visible change`, with confidence and an explanation for each capture point. |
+| Comparison detail | Users can open an individual comparison result for its explanation and confidence. Results are explicitly presented as observations for human review. |
+| Reports index | Lists locked inspections and indicates whether return evidence is pending or the transaction is frozen. |
+| Condition report | Shows inspection status, evidence count, comparison availability, and observed comparison results. It links back to the comparison screen. |
+| Report integrity trail | Shows before/after photos, playable baseline and return context videos, capture phase, timestamp, GPS availability, SHA-256, capturer, acknowledgement count, lock timestamp, and the engineering controls used to preserve the evidence trail. |
+| Toast feedback | Shows transient success or error feedback for copying a session code, acknowledging, and locking a baseline. |
+| Loading, empty, and error states | Asynchronous screens provide loading indicators, empty states, retry actions, permission messages, and recoverable error messages where implemented. |
 
-Supported MVP asset types are rental properties, bikes, and scooters. Cars and other asset types are future extensions.
+Supported asset types are scooters, bikes, apartments, and houses. Cars and other asset types are not currently supported.
 
-### User flow
+### Current user flow
 
-1. Owner creates a move-in or move-out inspection.
-2. The other party joins with a six-character code or QR code.
-3. Both parties complete guided, live camera evidence capture.
-4. The app records capture time, location, orientation/telemetry, and a SHA-256 digest.
-5. Both parties review and acknowledge the evidence; the baseline is then locked.
-6. A return inspection repeats the capture flow.
-7. The system compares baseline and return evidence and produces a condition report.
+1. Register and confirm an account, then sign in.
+2. Create an inspection, choose an asset and role, define photo titles, and share the code or QR code.
+3. The other participant joins using the six-character code.
+4. The owner captures the baseline through the live camera flow. The app hashes the image and records capture metadata before uploading it.
+5. Both participants review and acknowledge the baseline.
+6. The baseline is locked and becomes read-only.
+7. The renter captures the same configured points for the return condition.
+8. When all return points are complete, the transaction is frozen against further return evidence changes.
+9. The owner runs the comparison, reviews the results, and opens the condition report.
 
-The app may flag suspicious evidence or uncertain image changes. It must not claim a guarantee of authenticity, legal validity, or perfect spoof prevention.
+The product reports evidence signals and model observations. It does not claim guaranteed authenticity, legal validity, perfect spoof prevention, or automatic legal damage determination.
 
 ### Stack
 
@@ -114,8 +152,8 @@ The app may flag suspicious evidence or uncertain image changes. It must not cla
 src/
 ├── components/  # Reusable UI by domain
 ├── pages/       # Route-level screens
-├── services/    # Mock and real service adapters (to be added by feature owners)
-├── store/       # Zustand stores (to be added by feature owners)
+├── services/    # Facades plus mock and real auth/inspection adapters
+├── store/       # Zustand auth and inspection state
 ├── hooks/       # Browser integration hooks
 ├── utils/       # Shared helpers
 └── config/      # Client configuration
@@ -127,18 +165,43 @@ The frontend never receives AWS credentials. It authenticates through Cognito an
 
 Keep development in mock mode by default. Never create, deploy, or modify AWS resources that could incur charges without the team lead’s explicit approval. Bedrock calls are especially billable and should be invoked only through a controlled backend endpoint.
 
-## UI and quality bar
+## Design and quality bar
 
-Follow `DESIGN.md` exactly. The experience is mobile-first, calm, evidence-first, and practical.
+The experience is mobile-first, calm, evidence-first, and practical. Use the following rules when changing the interface:
 
-- Test at 375px and 390px before review; there must be no horizontal scroll.
-- All interactive controls need at least a 48px target.
-- Use Lucide—not emoji—for product iconography.
-- Use semantic status colour and text; brand colour is only for primary actions and selected navigation.
-- Build loading, empty, error, and permission-denied states for asynchronous screens.
-- Preserve existing pages and components outside your assigned scope.
+- Use Inter or the existing system UI fallback, sentence case, and restrained type hierarchy.
+- Use the existing tokens: white cards, `#F7F7F8` page surface, `#18181B` primary text, `#686870` supporting text, `#D93858` for primary actions, green for success, amber for waiting/review, and red for errors.
+- Use a 4px spacing rhythm, 16px mobile page padding, 640px maximum content width, 12px card radius, and 48px minimum interactive targets.
+- Use Lucide icons, never emoji or decorative stock art.
+- Keep one clear primary action per screen and reserve space for the persistent bottom navigation and safe area.
+- Show evidence before decoration. Do not add fake metrics, decorative charts, gradients, glass effects, neon, or unsupported authenticity/legal claims.
+- Use semantic status text in addition to colour. Provide loading, empty, permission-denied, validation, and recoverable-error states for asynchronous work.
+- Test at 375px, 390px, and desktop widths with no horizontal scrolling.
 
-## Current project status — September 19, 2026
+## Backend contract
+
+The deployed API is protected by Cognito except for registration, confirmation, and login. The frontend never receives AWS credentials.
+
+| Method | Route | Purpose |
+|---|---|---|
+| POST | `/auth/register` | Register an account. |
+| POST | `/auth/confirm` | Confirm an account with a Cognito code. |
+| POST | `/auth/login` | Sign in and receive tokens. |
+| POST | `/inspections` | Create an inspection. |
+| GET | `/inspections` | List inspections visible to the caller. |
+| GET | `/inspections/{id}` | Read an inspection visible to the caller. |
+| POST | `/inspections/{id}/join` | Join by session code. |
+| POST | `/inspections/{id}/evidence/upload-url` | Request a presigned S3 upload URL for a photo or context video. |
+| POST | `/inspections/{id}/evidence` | Persist uploaded evidence metadata. |
+| GET | `/inspections/{id}/evidence` | List evidence and signed view URLs. |
+| POST | `/inspections/{id}/acknowledge` | Record a participant acknowledgement. |
+| POST | `/inspections/{id}/lock` | Lock the baseline after both acknowledgements. |
+| POST | `/inspections/{id}/compare` | Run the owner-triggered Bedrock photo comparison. |
+| GET | `/inspections/{id}/compare` | Retrieve the latest persisted comparison. |
+
+Service boundaries are deliberate: pages use Zustand stores or the service facade, never concrete mock/real adapters. `VITE_USE_MOCK=true` uses local storage and no AWS calls; `VITE_USE_MOCK=false` uses Cognito, API Gateway, S3, and the deployed backend.
+
+## Current project status — September 20, 2026
 
 The real backend is deployed in `us-east-1`. Cognito registration, email confirmation, login, protected API access, inspection create/join, acknowledgement, baseline lock, S3 presigned uploads, and evidence metadata persistence are available through the deployed API. The frontend is connected in real mode with:
 
@@ -147,6 +210,27 @@ VITE_USE_MOCK=false
 VITE_API_ENDPOINT=https://5v3g0fkokj.execute-api.us-east-1.amazonaws.com/prod
 ```
 
-Completed frontend foundations include real/mock authentication adapters, session restoration, create/join inspection adapters, compatible six-character session-code handling, and a real-mode environment template. See `Utkrisht.md` for deployed API details and `TEAM_PLAN.md` for the active feature assignments.
+Completed frontend features include real/mock authentication adapters, session restoration, inspection creation/joining, QR and code sharing, guided camera capture, context video capture, SHA-256 hashing, geolocation capture, signed evidence reads, baseline review, joint acknowledgement, baseline locking, return capture, comparison screens, reports, profile management, persistent navigation, toast feedback, and frozen return transactions.
 
-The next product phase is the remaining README flow: guided evidence capture, review and joint acknowledgement, return evidence, controlled Bedrock comparison verification, comparison retrieval, and condition reports. The backend comparison endpoint exists but must not be described as verified until a real baseline/return comparison succeeds and the result is persisted and retrieved.
+The backend comparison path has been deployed and verified with real S3 evidence: the Lambda retrieves evidence, invokes Amazon Nova 2 Lite through Bedrock, validates the structured result, persists it in DynamoDB, and exposes the latest comparison to the frontend. Final product acceptance still includes testing the full hosted flow on real phones at 375px and 390px.
+
+### Known limitations
+
+- The UI identifies participants by role and joined state. The current inspection contract does not return the other participant’s display name.
+- The objection control in baseline review is a placeholder and does not persist an objection or notify the other party.
+- The capture flow records geolocation when permission is available. Device telemetry is collected by the camera component but is not currently persisted in the evidence metadata contract.
+- Context videos are stored and playable but are intentionally not analyzed by AI yet. Future video analysis is planned separately.
+- Condition reports are viewable in the app but are not currently downloaded or shared as files.
+- Owner and session-code lookup currently use DynamoDB scans; indexed queries should replace them before production-scale traffic.
+- Bedrock comparison is an explicit owner action and can incur model charges. Treat every result as reviewable output.
+
+## Hackathon release checklist
+
+- `npm install` completes from a clean checkout.
+- `npm run build` passes.
+- `npm run lint` completes; existing React effect warnings should be reviewed before production hardening.
+- `node --check backend/src/handler.mjs` passes.
+- The deployed CloudFormation stack is `UPDATE_COMPLETE`.
+- The hosted Amplify URL loads over HTTPS, including direct `/reports` and `/profile` routes.
+- Mobile acceptance is performed at 375px and 390px using the hosted URL.
+- The complete real Owner/Renter flow is tested with two confirmed Cognito accounts before presenting the demo as fully verified.

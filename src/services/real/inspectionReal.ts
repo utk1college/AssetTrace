@@ -32,6 +32,7 @@ interface ApiInspection {
   createdAt?: unknown;
   acknowledgements?: unknown
   lockedAt?: unknown
+  returnCompletedAt?: unknown
 }
 
 const endpoint = import.meta.env.VITE_API_ENDPOINT?.trim();
@@ -172,6 +173,7 @@ function inspectionFromApi(value: ApiInspection): Inspection {
     createdAt: stringField(value.createdAt, "createdAt"),
     acknowledgements,
     lockedAt: typeof value.lockedAt === "string" ? value.lockedAt : undefined,
+    returnCompletedAt: typeof value.returnCompletedAt === "string" ? value.returnCompletedAt : undefined,
   };
 }
 

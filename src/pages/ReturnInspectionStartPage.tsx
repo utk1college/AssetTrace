@@ -10,6 +10,7 @@ export default function ReturnInspectionStartPage() {
   const user = useAuthStore((state) => state.user);
   const [assetName, setAssetName] = useState<string | null>(null);
   const [isOwner, setIsOwner] = useState(false);
+  const [isFrozen, setIsFrozen] = useState(false);
   const [evidence, setEvidence] = useState<EvidenceMetadata[]>([]);
   const [error, setError] = useState<string | null>(null);
 
@@ -29,6 +30,7 @@ export default function ReturnInspectionStartPage() {
         }
 
         setAssetName(inspection.assetName);
+        setIsFrozen(Boolean(inspection.returnCompletedAt));
         if (user?.id === inspection.ownerId) {
           setIsOwner(true);
           setEvidence(await inspectionService.listEvidence(id, "return"));
@@ -74,7 +76,7 @@ export default function ReturnInspectionStartPage() {
           {isRenter ? "Capture the same areas again so the condition can be compared with the locked baseline." : "Review the renter's return evidence before comparing it with the locked baseline."}
         </p>
       </div>
-      {isRenter ? <PrimaryButton type="button" fullWidth onClick={() => navigate(`/inspections/${id}/return/capture`)}>Record return condition</PrimaryButton> : <>
+      {isFrozen ? <div className="card border-[var(--success)]/30 bg-[var(--success-light)] p-4"><p className="text-subheading">Transaction complete</p><p className="text-small mt-1">The return evidence is complete and this record is now frozen. No more photos or edits can be added.</p></div> : isRenter ? <PrimaryButton type="button" fullWidth onClick={() => navigate(`/inspections/${id}/return/capture`)}>Record return condition</PrimaryButton> : <>
         {evidence.length === 0 ? <p className="text-body">No return evidence has been submitted yet.</p> : <div className="space-y-4">{evidence.map((item) => <figure className="card overflow-hidden" key={item.evidenceId}>{item.viewUrl ? <img src={item.viewUrl} alt={`Return evidence for ${item.areaId}`} className="aspect-[4/3] w-full object-cover" /> : <div className="p-5">Image preview unavailable</div>}<figcaption className="p-4 text-body">{item.areaId}</figcaption></figure>)}<PrimaryButton type="button" fullWidth onClick={() => navigate(`/inspections/${id}/compare`)}>Compare return evidence</PrimaryButton></div>}
       </>}
     </main>

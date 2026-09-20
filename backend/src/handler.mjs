@@ -47,6 +47,7 @@ const allowedImageTypes = new Map([
   ['image/gif', 'gif'],
   ['image/webp', 'webp'],
 ])
+const allowedVideoTypes = new Set(['video/webm', 'video/mp4', 'video/quicktime'])
 const maxImageBytes = 25 * 1024 * 1024
 const maxImagesPerSide = 20
 const sessionCodeCharacters = 'ACDEFGHJKLMNPQRTUVWXYZ234679'
@@ -141,10 +142,12 @@ async function uploadUrl(event) {
   if (phase === 'return' && userId !== item.renterId) return fail(403, 'RENTER_ONLY', 'Only the renter can upload return evidence')
   if (!allowedEvidencePhases.has(phase)) return fail(400, 'INVALID_PHASE', 'Evidence phase must be baseline or return')
   if (phase === 'return' && item.status !== 'locked') return fail(409, 'BASELINE_REQUIRED', 'The baseline must be locked before return evidence can be uploaded')
-  const capturePoint = capturePointsFor(item).find((point) => point.id === (input.capturePointId ?? input.areaId))
+  const isContextVideo = input.mediaType === 'video' || input.capturePointId === 'context-video'
+  const capturePoint = isContextVideo ? { id: 'context-video', title: 'Context video', order: -1 } : capturePointsFor(item).find((point) => point.id === (input.capturePointId ?? input.areaId))
   if (!capturePoint) return fail(400, 'INVALID_CAPTURE_POINT', 'The photo title is not part of this inspection')
   if (item.status === 'locked' && phase === 'baseline') return fail(409, 'INSPECTION_LOCKED', 'Baseline evidence cannot be changed after locking')
-  if (!allowedImageTypes.has(input.contentType)) return fail(400, 'INVALID_CONTENT_TYPE', 'Evidence must be a JPEG, PNG, GIF, or WebP image')
+  const requestedContentType = String(input.contentType).split(';')[0].toLowerCase()
+  if ((!isContextVideo && !allowedImageTypes.has(requestedContentType)) || (isContextVideo && !allowedVideoTypes.has(requestedContentType))) return fail(400, 'INVALID_CONTENT_TYPE', 'Evidence must be a supported image or context video')
   const evidenceId = randomUUID(); const key = `inspections/${id}/${evidenceId}`
   const uploadUrl = await getSignedUrl(s3, new PutObjectCommand({ Bucket: config.bucket, Key: key, ContentType: input.contentType }), { expiresIn: 600 })
   return ok({ evidenceId, key, phase, uploadUrl, expiresIn: 600 })
@@ -160,18 +163,29 @@ async function saveEvidence(event) {
   if (phase === 'return' && userId !== item.renterId) return fail(403, 'RENTER_ONLY', 'Only the renter can save return evidence')
   if (!allowedEvidencePhases.has(phase)) return fail(400, 'INVALID_PHASE', 'Evidence phase must be baseline or return')
   if (phase === 'return' && item.status !== 'locked') return fail(409, 'BASELINE_REQUIRED', 'The baseline must be locked before return evidence can be saved')
-  const capturePoint = capturePointsFor(item).find((point) => point.id === (input.capturePointId ?? input.areaId))
+  if (phase === 'return' && item.returnCompletedAt) return fail(409, 'RETURN_LOCKED', 'This transaction is complete and return evidence is read-only')
+  const isContextVideo = input.mediaType === 'video' || input.capturePointId === 'context-video'
+  const capturePoint = isContextVideo ? { id: 'context-video', title: 'Context video', order: -1 } : capturePointsFor(item).find((point) => point.id === (input.capturePointId ?? input.areaId))
   if (!capturePoint) return fail(400, 'INVALID_CAPTURE_POINT', 'The photo title is not part of this inspection')
   if (item.status === 'locked' && phase === 'baseline') return fail(409, 'INSPECTION_LOCKED', 'Baseline evidence cannot be changed after locking')
   const expectedPrefix = `inspections/${id}/`
   if (typeof input.key !== 'string' || !input.key.startsWith(expectedPrefix)) return fail(400, 'INVALID_EVIDENCE_KEY', 'Evidence key does not belong to this inspection')
   const uploaded = await s3.send(new HeadObjectCommand({ Bucket: config.bucket, Key: input.key }))
   const contentType = uploaded.ContentType?.split(';')[0]?.toLowerCase()
-  if (!allowedImageTypes.has(contentType)) return fail(400, 'INVALID_CONTENT_TYPE', 'Evidence must be a JPEG, PNG, GIF, or WebP image')
+  if ((!isContextVideo && !allowedImageTypes.has(contentType)) || (isContextVideo && !allowedVideoTypes.has(contentType))) return fail(400, 'INVALID_CONTENT_TYPE', 'Evidence must be a supported image or context video')
   const evidence = { inspectionId: id, evidenceId: input.evidenceId, entity: 'evidence', ...input, areaId: capturePoint.id, capturePointId: capturePoint.id, capturePointTitle: capturePoint.title, phase, contentType, sizeBytes: uploaded.ContentLength, capturedBy: userIdOf(event), createdAt: new Date().toISOString() }
   await dynamodb.send(new PutItemCommand({ TableName: config.evidenceTable, Item: marshall(evidence, { removeUndefinedValues: true }), ConditionExpression: 'attribute_not_exists(inspectionId) AND attribute_not_exists(evidenceId)' }))
   if (phase === 'baseline' && !item.completedAreaIds?.includes(input.areaId)) {
     await dynamodb.send(new UpdateItemCommand({ TableName: config.inspectionsTable, Key: marshall({ inspectionId: id, sk: item.sk }), UpdateExpression: 'SET completedAreaIds = list_append(if_not_exists(completedAreaIds, :empty), :area), updatedAt = :updatedAt', ExpressionAttributeValues: marshall({ ':empty': [], ':area': [input.areaId], ':updatedAt': new Date().toISOString() }) }))
+  }
+  if (phase === 'return' && isContextVideo) {
+    const saved = await dynamodb.send(new ScanCommand({ TableName: config.evidenceTable, FilterExpression: 'inspectionId = :inspectionId AND phase = :phase', ExpressionAttributeValues: { ':inspectionId': { S: id }, ':phase': { S: 'return' } } }))
+    const savedEvidence = (saved.Items ?? []).map(unmarshall)
+    const completed = new Set(savedEvidence.filter((record) => record.mediaType !== 'video').map((record) => record.areaId))
+    if (capturePointsFor(item).every((point) => completed.has(point.id)) && savedEvidence.some((record) => record.mediaType === 'video')) {
+      const returnCompletedAt = new Date().toISOString()
+      await dynamodb.send(new UpdateItemCommand({ TableName: config.inspectionsTable, Key: marshall({ inspectionId: id, sk: item.sk }), UpdateExpression: 'SET returnCompletedAt = :returnCompletedAt, updatedAt = :updatedAt', ExpressionAttributeValues: marshall({ ':returnCompletedAt': returnCompletedAt, ':updatedAt': returnCompletedAt }) }))
+    }
   }
   return ok(evidence, 201)
 }
