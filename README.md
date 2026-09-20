@@ -1,6 +1,6 @@
 # AssetTrace
 
-**A shared, tamper-evident condition record for anything that changes hands: capture it together, lock it, and compare it when it comes back.**
+**"It was already like that." Not anymore. AssetTrace locks in the condition of anything you hand over, then shows you exactly what changed when it comes back.**
 
 Built by **Team Pandoras Box** for **First Commit** (WeMakeDevs × AWS, Bharat Builds Tour, Event 01) · Ship It track
 
@@ -27,7 +27,7 @@ Two people on either side of a handover, the **Owner** and the **Renter**, who b
 
 ## What it does
 
-1. **Owner and Renter capture the baseline together.** A guided in-app camera flow walks through named capture points (front, left side, kitchen, and so on), then records a short context video.
+1. **The Owner captures the baseline.** A guided in-app camera flow walks through named capture points (front, left side, kitchen, and so on). The app then prompts a short context video as an extra layer of spoof protection.
 2. **Both parties review and acknowledge it.** Only when both have acknowledged can the baseline be locked, after which it is read-only.
 3. **On return, the Renter captures the same points again**, plus a second context video. When every point is saved, the return is frozen.
 4. **The Owner runs an AI comparison.** Amazon Nova 2 Lite (through Amazon Bedrock) compares baseline and return photos point by point and labels each `Existing`, `New`, `Uncertain` or `No visible change`, with a confidence score and an explanation.
@@ -225,19 +225,16 @@ Mobile-first, calm, and evidence before decoration. White cards on a `#F7F7F8` s
 
 ## What we learned
 
-`<Edit this section with your team's own words. Judges score "Learning" directly. Some prompts based on what the code shows:>`
-
-- Designing a presigned-URL upload path so large media never touches Lambda, and verifying uploads server-side before trusting client metadata.
-- Getting a multimodal model to return strictly structured JSON, and validating it defensively instead of trusting it.
-- Modelling trust between two parties: joint acknowledgement, conditional writes for lock/freeze, and role-based rules enforced in the backend.
-- Building against real AWS while keeping a mock mode so the whole team could work in parallel without risking cost.
+- **Never trust the client, and never trust the model.** Evidence metadata is only saved after the backend confirms the file actually landed in S3, and the model's reply is parsed and strictly validated (allowed statuses, confidence between 0 and 1) before it is stored. Anything malformed is rejected instead of saved as a guess.
+- **Trust between two people has to be enforced on the server.** Locking the baseline, freezing the return, and Owner-only comparison are all backend rules backed by DynamoDB conditional writes, so the UI cannot be used to bend them.
+- **Camera, GPS and video only work over HTTPS.** Testing on real phones taught us that these browser APIs need a secure context, which is why the hosted build on Amplify became part of our workflow instead of a last-minute step.
+- **A mock mode let four people build in parallel.** Putting a service facade in front of mock and real adapters meant everyone could work on the UI without touching billable AWS resources, and we could switch to the real backend with a single flag.
 
 ## Known limitations
 
 We would rather be upfront about these than have you find them.
 
 - **Objections are a placeholder.** The Renter's "object" action in baseline review shows an alert but does not persist or notify.
-- **Videos are stored, not analysed.** Context videos are playable in the report but are not sent to Bedrock.
 - **Reports are in-app only.** There is no PDF or file export yet.
 - **Device telemetry is not persisted.** Orientation and motion are collected in the camera component but are not part of the saved evidence metadata. Geolocation is saved when permission is granted.
 - **The other party's name is not shown.** The UI identifies participants by role and joined state.
@@ -247,7 +244,7 @@ We would rather be upfront about these than have you find them.
 
 ## Roadmap
 
-Persisted objections with notifications, AI analysis of context videos, downloadable PDF condition reports, indexed queries, push notifications for handover steps, and more asset types such as cars.
+Persisted objections with notifications, downloadable PDF condition reports, indexed queries, push notifications for handover steps, and more asset types such as cars.
 
 ## Team
 
