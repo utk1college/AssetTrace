@@ -9,7 +9,6 @@ Built by **Team Pandoras Box** for **First Commit** (WeMakeDevs × AWS, Bharat B
 | **Live demo** | https://assettrace.d2re85crrtyc3z.amplifyapp.com *(open on a phone; camera, video and GPS need HTTPS)* |
 | **Demo video (3 min)** | `<add link>` |
 | **Repository** | https://github.com/utk1college/AssetTrace |
-| **Blog post** | `<add link>` |
 
 **Capture → Verify → Acknowledge → Lock → Return → Compare → Report**
 
@@ -105,7 +104,7 @@ flowchart LR
 
 ### Fastest: the hosted demo on two phones
 
-Both phones need internet access but not the same Wi-Fi.
+Both phones need internet access.
 
 1. Open https://assettrace.d2re85crrtyc3z.amplifyapp.com on both phones.
 2. Create two accounts from **Create an account**. Cognito emails a confirmation code, so use two real inboxes. Passwords need 8+ characters with upper case, lower case, a number and a symbol.
