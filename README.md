@@ -1,272 +1,265 @@
-The hosted build uses real mode. Open it on a phone over HTTPS to test camera, video, and geolocation permissions. The frontend is hosted by Amplify Hosting; the API uses Cognito, API Gateway, Lambda, DynamoDB, S3, and Bedrock.
-
-### Real mobile end-to-end test
-
-Use two phones if possible. A single phone can switch accounts, but two phones make the Owner/Renter handoff easier to observe. Both phones need internet access; they do not need to share Wi-Fi because the demo is hosted over HTTPS.
-1. Open the hosted URL on both phones: `https://assettrace.d2re85crrtyc3z.amplifyapp.com`.
-2. Create two separate Cognito accounts from **Create an account**. Use two real email inboxes because Cognito sends a confirmation code. Use a password with 8+ characters, uppercase, lowercase, number, and symbol.
-3. Sign in as the first user on Phone A. Choose **New inspection**, select **Wall**, name it something like `Living room wall`, choose **Owner**, and keep the default wall capture points or rename them to the exact surface sections you will test.
-4. Share the six-character session code shown after creation with the second user.
-5. On Phone A, open the inspection and choose **Record baseline condition**. Allow camera and location permissions. Capture every wall section, then record the guided context video by slowly scanning the full wall from left to right, including edges and visible marks. Stop the video or let the 15-second limit stop it, then continue to baseline review.
-6. On Phone B, sign in as the second user, choose **Join**, enter the six-character code, open the inspection, and review the baseline photos. The second user should acknowledge the baseline from the verification screen.
-7. On Phone A, acknowledge the same baseline. Once both acknowledgements appear, lock the baseline. Confirm the UI shows that the baseline is read-only.
-8. Before return capture, place a clearly visible object or mark on the wall without changing the baseline. On Phone B, open the locked inspection and choose **Record return condition**. Capture the same wall sections and record a second guided context video showing the changed wall.
-9. On Phone A, open the return review, confirm the return evidence is present, then open **Compare evidence**. The owner runs the comparison. This is the step that invokes Bedrock and may incur a charge.
-10. Open the **Condition report**. Confirm it contains before and after photos, both playable context videos, phase, timestamp, GPS availability, SHA-256, capturer, acknowledgement count, baseline lock time, comparison status, confidence, and explanation.
-11. Open **Reports** from the bottom navigation and confirm the inspection is listed. After all return photos and the return context video are saved, the transaction should show as frozen and further return uploads should be blocked.
-
-For a clean repeat, use a new inspection and different account pair. Do not use the same baseline after locking; locked evidence is intentionally immutable.
 # AssetTrace
 
-AssetTrace creates a shared, evidence-led condition record when a rental asset changes hands, then compares the move-in baseline with the return condition. The MVP supports scooters, bikes, apartments, houses, and walls/surfaces.
+**A shared, tamper-evident condition record for anything that changes hands: capture it together, lock it, and compare it when it comes back.**
+
+Built by **Team Pandoras Box** for **First Commit** (WeMakeDevs × AWS, Bharat Builds Tour, Event 01) · Ship It track
+
+| | |
+|---|---|
+| **Live demo** | https://assettrace.d2re85crrtyc3z.amplifyapp.com *(open on a phone; camera, video and GPS need HTTPS)* |
+| **Demo video (3 min)** | `<add link>` |
+| **Repository** | https://github.com/utk1college/AssetTrace |
+| **Blog post** | `<add link>` |
 
 **Capture → Verify → Acknowledge → Lock → Return → Compare → Report**
 
-## Start here
+---
 
-1. Use mock mode for isolated UI work and local development.
-2. Use the hosted demo for phone testing and real integration checks.
-3. Keep this README as the source of truth for product behavior, design rules, deployment details, and limitations.
+## The problem
 
-## Run locally
+Every rental handover ends the same way: *"it was already like that."*
 
-Requirements: Node.js 18 or later and npm.
+A tenant hands back a flat, a friend returns a borrowed scooter, a landlord repaints a wall. Nobody has proof of what the condition was at the start. Photos live on one person's phone, can be edited or lost, and the other party never agreed to them. Deposits get withheld and relationships sour over damage that no one can prove either way.
 
-### Teammate setup
+## Who it is for
 
-Clone the repository, create a feature branch, and install dependencies:
+Two people on either side of a handover, the **Owner** and the **Renter**, who both need to trust the same record. AssetTrace supports scooters, bikes, apartments, houses and walls/surfaces.
 
-```powershell
+## What it does
+
+1. **Owner and Renter capture the baseline together.** A guided in-app camera flow walks through named capture points (front, left side, kitchen, and so on), then records a short context video.
+2. **Both parties review and acknowledge it.** Only when both have acknowledged can the baseline be locked, after which it is read-only.
+3. **On return, the Renter captures the same points again**, plus a second context video. When every point is saved, the return is frozen.
+4. **The Owner runs an AI comparison.** Amazon Nova 2 Lite (through Amazon Bedrock) compares baseline and return photos point by point and labels each `Existing`, `New`, `Uncertain` or `No visible change`, with a confidence score and an explanation.
+5. **Everyone gets one condition report** with before/after photos, both videos, and the full integrity trail.
+
+Each piece of evidence carries its capture time, optional GPS, a **SHA-256 hash** computed in the browser, the capturer's identity, and its phase. The baseline lock time and both acknowledgements are stored with it.
+
+> **What we do not claim.** AssetTrace records evidence signals and produces AI observations *for human review*. It does not claim legal validity, guaranteed authenticity, perfect spoof prevention, or automatic damage determination. When the model cannot compare confidently, it says `Uncertain`.
+
+---
+
+## Where AWS fits
+
+AssetTrace is deployed end to end on AWS in `us-east-1`. Each service is there for a specific reason.
+
+| Service | Role in AssetTrace | Why this service |
+|---|---|---|
+| **Amazon Cognito** | Sign-up, email confirmation, sign-in, JWTs | Both parties need verified identities so the capturer of each piece of evidence is attributable. |
+| **Amazon API Gateway (HTTP API)** | Public API with a JWT authorizer on every route except register, confirm and login | Cheap, low-latency, and validates Cognito tokens before any code runs. |
+| **AWS Lambda** (Node.js 22) | One function handling all 14 routes: business rules, presigning, Bedrock orchestration | No servers to manage, and traffic is bursty and tied to handovers. |
+| **Amazon S3** | Photo and video evidence, uploaded directly from the phone via short-lived presigned URLs | Large media never passes through Lambda, and the browser never holds AWS credentials. |
+| **Amazon DynamoDB** | Three tables: `AssetTrace-Inspections`, `AssetTrace-Evidence`, `AssetTrace-Comparisons` | Session state, evidence metadata and comparison results with conditional writes for lock/freeze integrity. |
+| **Amazon Bedrock** (Amazon Nova 2 Lite) | Multimodal comparison of baseline vs return photos, returned as validated JSON | Vision reasoning without training or hosting a model. The model ID is a CloudFormation parameter. |
+| **AWS Amplify Hosting** | Serves the React frontend over HTTPS | Camera and geolocation APIs require a secure context, and hosting is one command away. |
+| **Amazon CloudWatch** | Lambda logs, including structured `request_failed` entries | Debugging the deployed flow. |
+| **AWS SAM / CloudFormation** | The whole backend is defined in `backend/template.yaml` | Reproducible deploys. |
+
+### Architecture
+
+```mermaid
+flowchart LR
+    subgraph Phone["Phone (React web app)"]
+        UI["Guided camera + context video<br/>SHA-256 + GPS in browser"]
+    end
+
+    Amplify["AWS Amplify Hosting<br/>(HTTPS frontend)"]
+    Cognito["Amazon Cognito<br/>User Pool"]
+    APIGW["API Gateway HTTP API<br/>JWT authorizer"]
+    Lambda["AWS Lambda<br/>(Node.js 22)"]
+    DDB[("DynamoDB<br/>Inspections · Evidence · Comparisons")]
+    S3[("Amazon S3<br/>evidence bucket")]
+    Bedrock["Amazon Bedrock<br/>Nova 2 Lite"]
+    CW["CloudWatch Logs"]
+
+    Amplify --> UI
+    UI -- "register / login" --> APIGW
+    APIGW -. "validates JWT" .-> Cognito
+    UI -- "REST + JWT" --> APIGW
+    APIGW --> Lambda
+    Lambda --> DDB
+    Lambda -- "presigned PUT/GET URLs" --> UI
+    UI -- "direct upload" --> S3
+    Lambda -- "read evidence" --> S3
+    Lambda -- "Converse API (images)" --> Bedrock
+    Lambda --> CW
+```
+
+### The two flows that matter
+
+**Evidence upload.** The phone asks the API for an upload URL, Lambda returns a 10-minute presigned S3 PUT URL, and the browser uploads the file straight to S3. It then saves the metadata through the API. Lambda checks the object actually exists in S3 before recording it, and refuses duplicate evidence IDs with a DynamoDB conditional write.
+
+**AI comparison.** Only the Owner can trigger it, and only after the baseline is locked. Lambda pulls the baseline and return images from S3 (validating that each key belongs to that inspection), sends them to Nova 2 Lite via the Bedrock Converse API at temperature 0, then parses and strictly validates the JSON before saving it to DynamoDB. If the model returns anything malformed, the request fails with `BEDROCK_INVALID_OUTPUT` instead of storing a guess.
+
+### Design decisions we made on purpose
+
+- **Immutability is enforced on the server.** Baseline lock uses a DynamoDB condition expression, and the return is frozen once every capture point is saved. The UI cannot bypass either.
+- **The browser never gets AWS credentials.** It talks to the API with a Cognito JWT and uploads only through presigned URLs.
+- **AI is advisory.** Results are `Existing`, `New`, `Uncertain` or `No visible change`, each with confidence and an explanation, and always presented as observations for review.
+- **Bedrock is expensive, so it is gated.** It runs only on an explicit Owner action, never automatically.
+- **Mock mode for safe development.** `VITE_USE_MOCK=true` runs the full flow locally with no AWS calls, so teammates could build UI without touching billable services.
+
+---
+
+## Try it
+
+### Fastest: the hosted demo on two phones
+
+Both phones need internet access but not the same Wi-Fi.
+
+1. Open https://assettrace.d2re85crrtyc3z.amplifyapp.com on both phones.
+2. Create two accounts from **Create an account**. Cognito emails a confirmation code, so use two real inboxes. Passwords need 8+ characters with upper case, lower case, a number and a symbol.
+3. **Phone A (Owner):** **New inspection** → choose **Wall** → name it `Living room wall` → role **Owner**. Note the six-character session code.
+4. **Phone A:** **Record baseline condition**. Allow camera and location, capture every section, then scan the wall left to right for the 15-second context video.
+5. **Phone B (Renter):** **Join**, enter the code, review the baseline photos, and acknowledge.
+6. **Phone A:** acknowledge, then lock the baseline. It is now read-only.
+7. Put a clearly visible object or mark on the wall. **Phone B:** **Record return condition**, capture the same sections, and record the return context video.
+8. **Phone A:** **Compare evidence** (this invokes Bedrock and may incur a small charge), then open the **Condition report**.
+9. Check **Reports** in the bottom nav. The transaction shows as frozen and further return uploads are blocked.
+
+For a clean repeat, start a new inspection with a new account pair. Locked baselines cannot be edited, by design.
+
+### Run the frontend locally (mock mode, no AWS needed)
+
+Requirements: Node.js 18+ and npm.
+
+```bash
 git clone https://github.com/utk1college/AssetTrace.git
 cd AssetTrace
-git switch -c feat/your-feature-name
 npm install
-Copy-Item .env.example .env.local
-```
-
-Leave `VITE_USE_MOCK=true` in `.env.local`. This is the safe default and does not call AWS. Start the frontend with `npm run dev`, then open the Vite URL and `/dashboard`.
-
-Before pushing a branch:
-
-```powershell
-npm run build
-npm run lint
-git add .
-git commit -m "Describe the feature"
-git push -u origin feat/your-feature-name
-```
-
-Open a pull request against `main`. Explain how the feature was tested. Never commit `.env.local`, AWS credentials, or secrets.
-
-After setup, run:
-
-```powershell
+cp .env.example .env.local     # Windows PowerShell: Copy-Item .env.example .env.local
 npm run dev
 ```
 
-Open the local URL printed by Vite, then visit `/dashboard`. Before opening a pull request, run:
+Open the Vite URL, then go to `/dashboard`. `.env.example` ships with `VITE_USE_MOCK=true`, which stores accounts and evidence in local storage and uses a deterministic mock comparison.
 
-```powershell
+| Mode | `VITE_USE_MOCK` | Talks to |
+|---|:---:|---|
+| Mock | `true` | Nothing. Local storage only. |
+| Real | `false` | Cognito, API Gateway, presigned S3 URLs, and the deployed Lambda/Bedrock backend. |
+
+Environment variables (all in `.env.example`, none are secrets):
+
+```text
+VITE_USE_MOCK=true
+VITE_AWS_REGION=us-east-1
+VITE_USER_POOL_ID=<cognito user pool id>
+VITE_USER_POOL_CLIENT_ID=<cognito app client id>
+VITE_API_ENDPOINT=<api gateway invoke URL>/prod
+VITE_S3_BUCKET=<evidence bucket name>
+```
+
+Before opening a pull request:
+
+```bash
 npm run build
 npm run lint
+node --check backend/src/handler.mjs
 ```
 
-## Development modes
+### Deploy your own backend
 
-The project has two intended service modes, selected by `VITE_USE_MOCK`.
+The backend is a single SAM template. You need the AWS CLI, the SAM CLI, an existing Cognito User Pool and app client (email + name attributes), and an S3 evidence bucket with the CORS rules in `backend/s3-cors.json`. You also need Bedrock model access for Amazon Nova 2 Lite in your region.
 
-| Mode | `VITE_USE_MOCK` | When to use it | AWS calls |
-|---|---:|---|---|
-| Mock | `true` | Default for all feature work and UI testing | None |
-| Real | `false` | Authenticated browser integration with the deployed API | Cognito, API Gateway, and presigned S3 upload URLs |
-
-Real mode requires the deployed API URL and a confirmed browser session. The checked-in `.env.example` contains the non-secret deployed endpoint; `.env.local` remains local-only.
-
-`.env.example` contains the shared non-secret identifiers. Never commit credentials, local access keys, or a populated `.env.local`.
-
-## Hosted demo
-
-The current AWS-hosted frontend is available at:
-
-```text
-https://assettrace.d2re85crrtyc3z.amplifyapp.com
+```bash
+cd backend
+sam build
+sam deploy --guided \
+  --parameter-overrides \
+    UserPoolId=<your-pool-id> \
+    UserPoolClientId=<your-client-id> \
+    EvidenceBucketName=<your-bucket> \
+    AllowedOrigin=<your-frontend-origin>
 ```
 
-The deployed API is:
+The three DynamoDB tables (`AssetTrace-Inspections`, `AssetTrace-Evidence`, `AssetTrace-Comparisons`) are referenced by the template, so create them first. The stack outputs the API base URL to put in `VITE_API_ENDPOINT`.
 
-```text
-https://5v3g0fkokj.execute-api.us-east-1.amazonaws.com/prod
-```
+---
 
-The hosted build uses real mode. Open it on a phone over HTTPS to test camera, video, and geolocation permissions. The frontend is hosted by Amplify Hosting; the API uses Cognito, API Gateway, Lambda, DynamoDB, S3, and Bedrock.
+## API
 
-### Real mobile end-to-end test
-
-Use two phones if possible. A single phone can switch accounts, but two phones make the Owner/Renter handoff easier to observe. Both phones need internet access; they do not need to share Wi-Fi because the demo is hosted over HTTPS.
-
-1. Open `https://assettrace.d2re85crrtyc3z.amplifyapp.com` on both phones.
-2. Create two separate Cognito accounts from **Create an account**. Use two real email inboxes because Cognito sends a confirmation code. Use a password with 8+ characters, uppercase, lowercase, number, and symbol.
-3. Sign in as the first user on Phone A. Choose **New inspection**, select **Wall**, name it `Living room wall`, choose **Owner**, and keep or rename the default wall capture points.
-4. Share the six-character session code shown after creation with the second user.
-5. On Phone A, choose **Record baseline condition**. Allow camera and location permissions. Capture every wall section, then record the guided context video by slowly scanning the full wall from left to right, including edges and visible marks.
-6. On Phone B, sign in as the second user, choose **Join**, enter the code, open the inspection, review the baseline photos, and acknowledge the baseline.
-7. On Phone A, acknowledge the same baseline. Once both acknowledgements appear, lock the baseline and confirm it is read-only.
-8. Place a clearly visible object or mark on the wall without changing the baseline. On Phone B, open the locked inspection, choose **Record return condition**, capture the same wall sections, and record the second guided context video showing the changed wall.
-9. On Phone A, open **Compare evidence**. The owner runs the comparison. This invokes Bedrock and may incur a charge.
-10. Open **Condition report**. Confirm before/after photos, both playable context videos, phase, timestamp, GPS availability, SHA-256, capturer, acknowledgement count, lock time, comparison status, confidence, and explanation.
-11. Open **Reports** from the bottom navigation. After all return photos and the return context video are saved, the transaction should show as frozen and further return uploads should be blocked.
-
-For a clean repeat, use a new inspection and account pair. Do not try to change baseline evidence after locking; immutability is intentional.
-
-## Product and technical scope
-
-### Implemented product features
-
-The following features are implemented in the current frontend and backend. Statuses and limitations are documented below rather than inferred from the product plan.
-
-| Feature | What it does |
-|---|---|
-| Account registration | Creates an account with name, email, and password. Real mode uses Cognito; mock mode stores test accounts locally. |
-| Email confirmation | Real mode supports Cognito confirmation codes and handles unconfirmed accounts during sign-in. Mock mode accepts a non-empty code. |
-| Sign-in and session restoration | Logs users in, stores the session through the selected auth adapter, restores the current user on app load, and supports sign-out. |
-| Protected navigation | Dashboard, inspections, capture, review, comparison, reports, and profile require authentication. Login and registration are public-only routes. |
-| Profile page | Shows the signed-in user’s name and email, with an explicit sign-out action. |
-| Inspection creation | Creates a session for a scooter, bike, apartment, house, or wall/surface, with a custom asset name and move-in or move-out type. |
-| Role selection | The creator chooses Owner or Renter for the session. The second participant receives the opposite session role when joining. |
-| Custom capture points | The creator can edit, add, and remove photo titles. Those stable titles become the required return-capture points. |
-| Session sharing | Generates a six-character session code and QR code. The code can be copied and shared with the other participant. |
-| Session joining | Validates the six-character code for the active mode, finds the inspection, and prevents a participant from joining their own session. |
-| Inspection dashboard | Lists inspections visible to the signed-in user, shows asset type, participant role, progress, session stage, and lock/frozen status. |
-| Persistent mobile navigation | Provides Home, New inspection, Join, and Reports destinations throughout authenticated screens. |
-| Camera capture | Requests the device camera, prefers the rear-facing camera, displays a live preview, captures JPEG evidence, and supports camera-permission retry. |
-| Guided context video | Captures one short, phase-specific video after the photo sequence at handover/baseline and return. Directions are asset-aware: bikes scan sides and frame; walls scan the full surface and edges; properties scan relevant rooms/surfaces. Videos are stored with duration, timestamp, phase, GPS availability, SHA-256, and capturer identity. Video is not sent to Bedrock. |
-| Evidence metadata | Records capture time, optional geolocation, SHA-256 media digest, phase, capture point, content type, and suspicious flag. Current capture flow sets `suspicious` to `false`. |
-| Evidence upload | Real mode requests a short-lived presigned S3 URL, uploads the image directly to S3, then saves metadata through the API. Mock mode uses local object URLs and local storage. |
-| Capture retry | Keeps a failed capture in the current screen and offers a retry for the metadata/upload operation. |
-| Baseline review | Participants can review signed image URLs for baseline evidence and see capture progress. The renter has a placeholder objection action that currently displays an alert and does not create a backend objection record. |
-| Joint acknowledgement | Each participant records an acknowledgement. The baseline cannot be locked until all required baseline areas are captured and both parties acknowledge. |
-| Baseline lock | Locks the baseline and prevents further baseline evidence changes. The lock timestamp and acknowledgement records are persisted. |
-| Return inspection | After baseline lock, only the renter can capture return evidence. The owner can review submitted return evidence. |
-| Return transaction freeze | When all configured return capture points are saved, the inspection records `returnCompletedAt` and rejects further return evidence uploads. The UI presents the transaction as complete and read-only. |
-| Evidence comparison | Mock mode produces a deterministic review result. Real mode sends baseline and return image bytes to Amazon Nova 2 Lite through Bedrock. |
-| Comparison classifications | Results can be `Existing`, `New`, `Uncertain`, or `No visible change`, with confidence and an explanation for each capture point. |
-| Comparison detail | Users can open an individual comparison result for its explanation and confidence. Results are explicitly presented as observations for human review. |
-| Reports index | Lists locked inspections and indicates whether return evidence is pending or the transaction is frozen. |
-| Condition report | Shows inspection status, evidence count, comparison availability, and observed comparison results. It links back to the comparison screen. |
-| Report integrity trail | Shows before/after photos, playable baseline and return context videos, capture phase, timestamp, GPS availability, SHA-256, capturer, acknowledgement count, lock timestamp, and the engineering controls used to preserve the evidence trail. |
-| Toast feedback | Shows transient success or error feedback for copying a session code, acknowledging, and locking a baseline. |
-| Loading, empty, and error states | Asynchronous screens provide loading indicators, empty states, retry actions, permission messages, and recoverable error messages where implemented. |
-
-Supported asset types are scooters, bikes, apartments, houses, and walls/surfaces. Cars and other asset types are not currently supported.
-
-### Current user flow
-
-1. Register and confirm an account, then sign in.
-2. Create an inspection, choose an asset and role, define photo titles, and share the code or QR code.
-3. The other participant joins using the six-character code.
-4. The owner captures the baseline through the live camera flow. The app hashes the image and records capture metadata before uploading it.
-5. Both participants review and acknowledge the baseline.
-6. The baseline is locked and becomes read-only.
-7. The renter captures the same configured points for the return condition.
-8. When all return points and the return context video are complete, the transaction is frozen against further return evidence changes.
-9. The owner runs the comparison, reviews the results, and opens the condition report.
-
-The product reports evidence signals and model observations. It does not claim guaranteed authenticity, legal validity, perfect spoof prevention, or automatic legal damage determination.
-
-### Stack
-
-- React, Vite, and TypeScript
-- Tailwind CSS v4, Lucide icons, and the shared component/design system
-- Zustand for client state
-- React Router
-- AWS Cognito, API Gateway, Lambda, DynamoDB, S3, Bedrock, and CloudWatch for the deployed path
-- Browser APIs: camera, geolocation, device orientation/motion, and Web Crypto
-
-### Repository layout
-
-```text
-src/
-├── components/  # Reusable UI by domain
-├── pages/       # Route-level screens
-├── services/    # Facades plus mock and real auth/inspection adapters
-├── store/       # Zustand auth and inspection state
-├── hooks/       # Browser integration hooks
-├── utils/       # Shared helpers
-└── config/      # Client configuration
-```
-
-## AWS architecture and safety
-
-The frontend never receives AWS credentials. It authenticates through Cognito and uses the API for application data. For uploads, the API issues a short-lived presigned S3 URL; the browser then uploads directly to S3.
-
-Keep development in mock mode by default. Never create, deploy, or modify AWS resources that could incur charges without the team lead’s explicit approval. Bedrock calls are especially billable and should be invoked only through a controlled backend endpoint.
-
-## Design and quality bar
-
-The experience is mobile-first, calm, evidence-first, and practical. Use the following rules when changing the interface:
-
-- Use Inter or the existing system UI fallback, sentence case, and restrained type hierarchy.
-- Use the existing tokens: white cards, `#F7F7F8` page surface, `#18181B` primary text, `#686870` supporting text, `#D93858` for primary actions, green for success, amber for waiting/review, and red for errors.
-- Use a 4px spacing rhythm, 16px mobile page padding, 640px maximum content width, 12px card radius, and 48px minimum interactive targets.
-- Use Lucide icons, never emoji or decorative stock art.
-- Keep one clear primary action per screen and reserve space for the persistent bottom navigation and safe area.
-- Show evidence before decoration. Do not add fake metrics, decorative charts, gradients, glass effects, neon, or unsupported authenticity/legal claims.
-- Use semantic status text in addition to colour. Provide loading, empty, permission-denied, validation, and recoverable-error states for asynchronous work.
-- Test at 375px, 390px, and desktop widths with no horizontal scrolling.
-
-## Backend contract
-
-The deployed API is protected by Cognito except for registration, confirmation, and login. The frontend never receives AWS credentials.
+Every route requires a Cognito JWT except the three `/auth/*` routes.
 
 | Method | Route | Purpose |
 |---|---|---|
-| POST | `/auth/register` | Register an account. |
-| POST | `/auth/confirm` | Confirm an account with a Cognito code. |
-| POST | `/auth/login` | Sign in and receive tokens. |
-| POST | `/inspections` | Create an inspection. |
-| GET | `/inspections` | List inspections visible to the caller. |
-| GET | `/inspections/{id}` | Read an inspection visible to the caller. |
-| POST | `/inspections/{id}/join` | Join by session code. |
-| POST | `/inspections/{id}/evidence/upload-url` | Request a presigned S3 upload URL for a photo or context video. |
-| POST | `/inspections/{id}/evidence` | Persist uploaded evidence metadata. |
-| GET | `/inspections/{id}/evidence` | List evidence and signed view URLs. |
-| POST | `/inspections/{id}/acknowledge` | Record a participant acknowledgement. |
-| POST | `/inspections/{id}/lock` | Lock the baseline after both acknowledgements. |
-| POST | `/inspections/{id}/compare` | Run the owner-triggered Bedrock photo comparison. |
-| GET | `/inspections/{id}/compare` | Retrieve the latest persisted comparison. |
+| POST | `/auth/register` | Register an account |
+| POST | `/auth/confirm` | Confirm with the emailed code |
+| POST | `/auth/login` | Sign in and receive tokens |
+| POST | `/inspections` | Create an inspection |
+| GET | `/inspections` | List inspections the caller is part of |
+| GET | `/inspections/{id}` | Read one inspection |
+| POST | `/inspections/{id}/join` | Join by six-character session code |
+| POST | `/inspections/{id}/evidence/upload-url` | Get a presigned S3 URL for a photo or context video |
+| POST | `/inspections/{id}/evidence` | Save evidence metadata after upload |
+| GET | `/inspections/{id}/evidence` | List evidence with signed view URLs |
+| POST | `/inspections/{id}/acknowledge` | Record a participant's acknowledgement |
+| POST | `/inspections/{id}/lock` | Lock the baseline (needs both acknowledgements) |
+| POST | `/inspections/{id}/compare` | Owner-only Bedrock photo comparison |
+| GET | `/inspections/{id}/compare` | Latest saved comparison |
 
-Service boundaries are deliberate: pages use Zustand stores or the service facade, never concrete mock/real adapters. `VITE_USE_MOCK=true` uses local storage and no AWS calls; `VITE_USE_MOCK=false` uses Cognito, API Gateway, S3, and the deployed backend.
+## Tech stack
 
-## Current project status — September 20, 2026
-
-The real backend is deployed in `us-east-1`. Cognito registration, email confirmation, login, protected API access, inspection create/join, acknowledgement, baseline lock, S3 presigned uploads, and evidence metadata persistence are available through the deployed API. The frontend is connected in real mode with:
+**Frontend:** React 19, Vite, TypeScript, Tailwind CSS v4, Zustand, React Router, Lucide icons, `qrcode.react`. Browser APIs: camera, MediaRecorder, geolocation, device orientation, Web Crypto.
+**Backend:** Node.js 22 on Lambda, AWS SDK v3, SAM.
 
 ```text
-VITE_USE_MOCK=false
-VITE_API_ENDPOINT=https://5v3g0fkokj.execute-api.us-east-1.amazonaws.com/prod
+src/
+├── components/  # Reusable UI by domain (capture, evidence, comparison, report, layout…)
+├── pages/       # Route-level screens
+├── services/    # Facades over mock and real auth/inspection adapters
+├── store/       # Zustand auth and inspection state
+├── hooks/       # Browser integration hooks
+├── utils/       # SHA-256, geolocation, telemetry, session codes
+└── config/      # Client configuration
+backend/
+├── src/handler.mjs     # Lambda handler for all routes
+├── template.yaml       # SAM template (API, authorizer, function, IAM)
+└── s3-cors.json        # CORS rules for the evidence bucket
 ```
 
-Completed frontend features include real/mock authentication adapters, session restoration, inspection creation/joining, QR and code sharing, guided camera capture, context video capture, SHA-256 hashing, geolocation capture, signed evidence reads, baseline review, joint acknowledgement, baseline locking, return capture, comparison screens, reports, profile management, persistent navigation, toast feedback, and frozen return transactions.
+Pages talk to Zustand stores or the service facade, never to the mock or real adapters directly. That boundary is what makes mock mode a one-flag switch.
 
-The backend comparison path has been deployed and verified with real S3 evidence: the Lambda retrieves evidence, invokes Amazon Nova 2 Lite through Bedrock, validates the structured result, persists it in DynamoDB, and exposes the latest comparison to the frontend. Final product acceptance still includes testing the full hosted flow on real phones at 375px and 390px.
+## Design principles
 
-### Known limitations
+Mobile-first, calm, and evidence before decoration. White cards on a `#F7F7F8` surface, `#D93858` for the primary action, 48px minimum touch targets, one clear primary action per screen, and semantic status text alongside colour. No fake metrics, decorative charts or unsupported authenticity claims. Loading, empty, permission-denied and recoverable-error states are handled on every async screen.
 
-- The UI identifies participants by role and joined state. The current inspection contract does not return the other participant’s display name.
-- The objection control in baseline review is a placeholder and does not persist an objection or notify the other party.
-- The capture flow records geolocation when permission is available. Device telemetry is collected by the camera component but is not currently persisted in the evidence metadata contract.
-- Context videos are stored and playable but are intentionally not analyzed by AI yet. Future video analysis is planned separately.
-- Condition reports are viewable in the app but are not currently downloaded or shared as files.
-- Owner and session-code lookup currently use DynamoDB scans; indexed queries should replace them before production-scale traffic.
-- Bedrock comparison is an explicit owner action and can incur model charges. Treat every result as reviewable output.
+## What we learned
 
-## Hackathon release checklist
+`<Edit this section with your team's own words. Judges score "Learning" directly. Some prompts based on what the code shows:>`
 
-- `npm install` completes from a clean checkout.
-- `npm run build` passes.
-- `npm run lint` completes; existing React effect warnings should be reviewed before production hardening.
-- `node --check backend/src/handler.mjs` passes.
-- The deployed CloudFormation stack is `UPDATE_COMPLETE`.
-- The hosted Amplify URL loads over HTTPS, including direct `/reports` and `/profile` routes.
-- Mobile acceptance is performed at 375px and 390px using the hosted URL.
-- The complete real Owner/Renter flow is tested with two confirmed Cognito accounts before presenting the demo as fully verified.
+- Designing a presigned-URL upload path so large media never touches Lambda, and verifying uploads server-side before trusting client metadata.
+- Getting a multimodal model to return strictly structured JSON, and validating it defensively instead of trusting it.
+- Modelling trust between two parties: joint acknowledgement, conditional writes for lock/freeze, and role-based rules enforced in the backend.
+- Building against real AWS while keeping a mock mode so the whole team could work in parallel without risking cost.
+
+## Known limitations
+
+We would rather be upfront about these than have you find them.
+
+- **Objections are a placeholder.** The Renter's "object" action in baseline review shows an alert but does not persist or notify.
+- **Videos are stored, not analysed.** Context videos are playable in the report but are not sent to Bedrock.
+- **Reports are in-app only.** There is no PDF or file export yet.
+- **Device telemetry is not persisted.** Orientation and motion are collected in the camera component but are not part of the saved evidence metadata. Geolocation is saved when permission is granted.
+- **The other party's name is not shown.** The UI identifies participants by role and joined state.
+- **Some lookups use DynamoDB `Scan`.** Session-code, owner and evidence lookups should move to indexed queries (GSIs) before real traffic.
+- **Hardening still to do for production.** CORS is currently `*` in the template default (the S3 bucket CORS is already restricted to the app origin), `bedrock:InvokeModel` is granted on `*` and should be scoped to the specific model, and a suspicious-capture signal exists in the data model but is currently always `false`.
+- **Cost.** Each comparison is a Bedrock call. It is owner-triggered only.
+
+## Roadmap
+
+Persisted objections with notifications, AI analysis of context videos, downloadable PDF condition reports, indexed queries, push notifications for handover steps, and more asset types such as cars.
+
+## Team
+
+**Pandoras Box**
+
+| Name | Role |
+|---|---|
+| `<name>` | `<role>` |
+| `<name>` | `<role>` |
+| `<name>` | `<role>` |
+| `<name>` | `<role>` |
+
+## Contributing
+
+Create a feature branch, keep development in mock mode by default, run `npm run build` and `npm run lint`, and open a pull request against `main` describing how you tested it. Never commit `.env.local`, AWS credentials or secrets. Do not create or change AWS resources that can incur charges without the team lead's approval.
