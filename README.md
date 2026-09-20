@@ -242,10 +242,6 @@ As an MVP, several production-grade enhancements are intentionally left for futu
 - Automated suspicious-capture detection
 - Cost & performance optimization
 
-## Roadmap
-
-Persisted objections with notifications, downloadable PDF condition reports, indexed queries, push notifications for handover steps, and more asset types such as cars.
-
 ## Team
 
 **Pandoras Box**
