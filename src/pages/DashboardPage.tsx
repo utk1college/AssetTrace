@@ -80,7 +80,7 @@ useEffect(() => {
     <div className="min-h-screen bg-[var(--surface)] pb-24">
       <div className="container py-6">
         <header className="mb-7">
-          <p className="text-small mb-1">Evidence-led handovers</p>
+          <p className="text-small mb-1">Hi, {user?.name ?? 'there'}</p>
           <h1 className="text-display">Your inspections</h1>
           <p className="text-body mt-2">Secure the starting condition, compare the return, and keep one clear record.</p>
         </header>

@@ -366,7 +366,7 @@ export async function saveEvidence(
   allEvidence.push(evidence);
   writeEvidence(allEvidence);
 
-  if (request.phase === "baseline" && !inspection.completedAreaIds.includes(request.areaId)) {
+  if (request.phase === "baseline" && request.mediaType !== "video" && !inspection.completedAreaIds.includes(request.areaId)) {
     const inspections = readInspections();
     const inspectionIndex = inspections.findIndex((item) => item.id === inspectionId);
     if (inspectionIndex !== -1) {
