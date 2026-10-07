@@ -102,7 +102,3 @@ backend/
 ├── template.yaml
 └── s3-cors.json
 ```
-
-## Team
-
-Pandoras Box: Utkrisht Umang, Saahya K S, Abdul Ahad, and Shreyash Shaurya.
