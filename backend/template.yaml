@@ -7,15 +7,12 @@ Description: AssetTrace backend API. Deploy only after reviewing the contract an
 Parameters:
   UserPoolId:
     Type: String
-    Default: us-east-1_Rmddod48y
 
   UserPoolClientId:
     Type: String
-    Default: 5o2c4idi7i55kfangcld9fmtui
 
   EvidenceBucketName:
     Type: String
-    Default: assettrace-evidence-650687536843
 
   AllowedOrigin:
     Type: String
